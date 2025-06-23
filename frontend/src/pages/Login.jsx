@@ -147,7 +147,7 @@ const Login = () => {
         >
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold mb-2">Welcome Back</h1>
-            <p className="text-gray-400">Sign in to your account</p>
+            <p className="text-gray-400">Continue your internship journey</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -222,9 +222,9 @@ const Login = () => {
 
           <div className="mt-8 text-center">
             <p className="text-gray-400">
-              Don't have an account?{' '}
+              New student?{' '}
               <Link to="/signup" className="text-purple-400 hover:text-purple-300 font-semibold">
-                Sign up
+                Create your account
               </Link>
             </p>
           </div>

@@ -114,6 +114,7 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 
 USE_TZ = True
+GEMINI_API_KEY ="AIzaSyAdipWsk-EcwnaMhneZ7ihLKovVF6wWdkY"
 
 
 # Static files (CSS, JavaScript, Images)
@@ -135,8 +136,8 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 
 # MongoDB configuration
-MONGODB_URI = "mongodb+srv://1QoSRtE75wSEibZJ:1QoSRtE75wSEibZJ@cluster0.mregq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-MONGODB_DATABASE = "SampleDB"
+MONGODB_URI = "mongodb+srv://ihub:ihub@harlee.6sokd.mongodb.net/"
+MONGODB_DATABASE = "Agentci_AI"
 MONGODB_COLLECTION = "Users"
 
 # REST Framework settings

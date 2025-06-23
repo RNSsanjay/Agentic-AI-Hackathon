@@ -1,24 +1,24 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, Shield, Zap, Users } from 'lucide-react';
+import { ArrowRight, Shield, Zap, Users, Brain, Target, BookOpen } from 'lucide-react';
 
 const Landing = () => {
   const features = [
     {
-      icon: <Shield className="w-8 h-8" />,
-      title: "Secure & Private",
-      description: "Your data is protected with enterprise-grade security and end-to-end encryption."
+      icon: <Brain className="w-8 h-8" />,
+      title: "AI-Powered Matching",
+      description: "Our advanced AI analyzes your skills, interests, and career goals to recommend the perfect internship opportunities."
     },
     {
-      icon: <Zap className="w-8 h-8" />,
-      title: "Lightning Fast",
-      description: "Built for speed with modern technology stack for optimal performance."
+      icon: <Target className="w-8 h-8" />,
+      title: "Portfolio Alignment",
+      description: "Get personalized recommendations to optimize your portfolio and increase your chances of landing your dream internship."
     },
     {
-      icon: <Users className="w-8 h-8" />,
-      title: "Team Collaboration",
-      description: "Work together seamlessly with real-time collaboration features."
+      icon: <BookOpen className="w-8 h-8" />,
+      title: "Skill Gap Analysis",
+      description: "Identify missing skills and get curated learning paths to make yourself more competitive in the job market."
     }
   ];
 
@@ -61,7 +61,7 @@ const Landing = () => {
             animate={{ opacity: 1, x: 0 }}
             className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent"
           >
-            AppName
+            InternAI
           </motion.div>
           <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -93,9 +93,9 @@ const Landing = () => {
             transition={{ delay: 0.2 }}
             className="text-6xl md:text-8xl font-bold mb-8"
           >
-            Welcome to the
+            Find Your Perfect
             <span className="block bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
-              Future
+              Internship
             </span>
           </motion.h1>
           <motion.p
@@ -104,8 +104,8 @@ const Landing = () => {
             transition={{ delay: 0.4 }}
             className="text-xl md:text-2xl text-gray-300 mb-12 max-w-3xl mx-auto"
           >
-            Experience the next generation of digital productivity with our cutting-edge platform
-            designed for modern teams and individuals.
+            AI-powered internship recommendations tailored to your skills, interests, and career goals. 
+            Align your portfolio and bridge skill gaps to land your dream opportunity.
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -117,14 +117,14 @@ const Landing = () => {
               to="/signup"
               className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all transform hover:scale-105 hover:shadow-xl hover:shadow-purple-500/25"
             >
-              Start Free Trial
+              Start Your Journey
               <ArrowRight className="ml-2 w-5 h-5" />
             </Link>
             <Link
               to="/login"
               className="inline-flex items-center px-8 py-4 border border-gray-600 rounded-xl text-lg font-semibold hover:border-gray-400 hover:bg-gray-900/50 transition-all"
             >
-              Watch Demo
+              Explore Demo
             </Link>
           </motion.div>
         </div>
@@ -138,7 +138,7 @@ const Landing = () => {
           viewport={{ once: true }}
           className="text-4xl md:text-5xl font-bold text-center mb-16"
         >
-          Why Choose Us?
+          Why Choose InternAI?
         </motion.h2>
         <div className="grid md:grid-cols-3 gap-8">
           {features.map((feature, index) => (
@@ -169,16 +169,16 @@ const Landing = () => {
           className="text-center bg-gradient-to-r from-purple-900/50 to-blue-900/50 backdrop-blur-sm border border-purple-500/20 rounded-3xl p-16"
         >
           <h2 className="text-4xl md:text-5xl font-bold mb-6">
-            Ready to Get Started?
+            Ready to Launch Your Career?
           </h2>
           <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-            Join thousands of users who are already experiencing the future of productivity.
+            Join thousands of students who have already discovered their perfect internship matches with our AI-powered platform.
           </p>
           <Link
             to="/signup"
             className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all transform hover:scale-105 hover:shadow-xl hover:shadow-purple-500/25"
           >
-            Start Your Journey
+            Get Started Free
             <ArrowRight className="ml-2 w-5 h-5" />
           </Link>
         </motion.div>
@@ -188,7 +188,7 @@ const Landing = () => {
       <footer className="relative z-10 border-t border-gray-800 mt-20">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="text-center text-gray-400">
-            <p>&copy; 2024 AppName. All rights reserved.</p>
+            <p>&copy; 2024 InternAI. All rights reserved.</p>
           </div>
         </div>
       </footer>

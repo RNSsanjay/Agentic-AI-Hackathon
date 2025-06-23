@@ -195,11 +195,12 @@ const Signup = () => {
           className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-8"
         >
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold mb-2">Create Account</h1>
-            <p className="text-gray-400">Join us and start your journey</p>
+            <h1 className="text-3xl font-bold mb-2">Join InternAI</h1>
+            <p className="text-gray-400">Start your AI-powered internship search today</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6" noValidate>            <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+            <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="first_name" className="block text-sm font-medium text-gray-300 mb-2">
                 First Name
@@ -362,9 +363,9 @@ const Signup = () => {
               {isLoading ? (
                 <>
                   <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
-                  Creating Account...
+                  Creating Your Profile...
                 </>
-              ) : 'Create Account'}
+              ) : 'Start My Internship Journey'}
             </motion.button>
           </form>
 
@@ -374,6 +375,9 @@ const Signup = () => {
               <Link to="/login" className="text-purple-400 hover:text-purple-300 font-semibold focus:outline-none focus:underline">
                 Sign in
               </Link>
+            </p>
+            <p className="text-xs text-gray-500 mt-2">
+              Join 10,000+ students finding their perfect internships with AI
             </p>
           </div>
         </motion.div>
