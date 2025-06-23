@@ -7,7 +7,9 @@ import {
   AlertCircle, Star, CheckCircle, User, Award, TrendingUp, RefreshCw,
   Eye, EyeOff, MessageSquare, Activity, Zap, ChevronDown, ChevronUp,
   Code, Database, Globe, Briefcase, Mail, Phone, MapPin,
-  Calendar, ExternalLink, Copy, Download, Share2
+  Calendar, ExternalLink, Copy, Download, Share2, Building,
+  DollarSign, Timer, Sparkles, ArrowRight, BookmarkPlus,
+  Filter, Search, Heart, Users, Laptop
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import axios from 'axios';
@@ -171,7 +173,7 @@ const Home = () => {
 
   const validatePreferences = (prefs) => {
     return Array.isArray(prefs) && prefs.length > 0 &&
-           prefs.every(pref => typeof pref === 'string' && pref.trim().length > 0);
+      prefs.every(pref => typeof pref === 'string' && pref.trim().length > 0);
   };
 
   const handlePreferenceToggle = (domain) => {
@@ -439,6 +441,7 @@ const Home = () => {
             recentActivity={recentActivity}
             showAgentComm={showAgentComm}
             setShowAgentComm={setShowAgentComm}
+            setAnalysisResults={setAnalysisResults}
           />
         </div>
       </motion.div>
@@ -642,11 +645,10 @@ const DomainPreferences = ({ selectedPreferences, availableDomains, handlePrefer
         <button
           key={domain}
           onClick={() => handlePreferenceToggle(domain)}
-          className={`p-2 text-xs rounded-lg transition-all ${
-            selectedPreferences.includes(domain)
+          className={`p-2 text-xs rounded-lg transition-all ${selectedPreferences.includes(domain)
               ? 'bg-blue-600 text-white border-blue-500'
               : 'bg-gray-700/50 text-gray-300 border-gray-600 hover:bg-gray-600/50'
-          } border`}
+            } border`}
         >
           {domain}
         </button>
@@ -901,15 +903,14 @@ const AgentCommunicationItem = ({
             {communications.map((comm, idx) => (
               <div
                 key={idx}
-                className={`w-2 h-2 rounded-full ${
-                  comm.status === 'success' || comm.status === 'completed'
+                className={`w-2 h-2 rounded-full ${comm.status === 'success' || comm.status === 'completed'
                     ? 'bg-green-400'
                     : comm.status === 'failed'
-                    ? 'bg-red-400'
-                    : comm.status === 'processing' || comm.status === 'started'
-                    ? 'bg-blue-400'
-                    : 'bg-yellow-400'
-                }`}
+                      ? 'bg-red-400'
+                      : comm.status === 'processing' || comm.status === 'started'
+                        ? 'bg-blue-400'
+                        : 'bg-yellow-400'
+                  }`}
               />
             ))}
           </div>
@@ -1148,9 +1149,8 @@ const ExtractedTextDisplay = ({ analysisResults, showFullText, setShowFullText }
       </span>
     </div>
 
-    <div className={`p-4 bg-gray-900/50 text-sm text-gray-300 whitespace-pre-wrap font-mono leading-relaxed ${
-      showFullText ? 'max-h-none' : 'max-h-64'
-    } overflow-y-auto transition-all duration-300`}>
+    <div className={`p-4 bg-gray-900/50 text-sm text-gray-300 whitespace-pre-wrap font-mono leading-relaxed ${showFullText ? 'max-h-none' : 'max-h-64'
+      } overflow-y-auto transition-all duration-300`}>
       {analysisResults.file_info?.resume_text ? (
         <motion.div
           initial={{ opacity: 0 }}
@@ -1160,7 +1160,7 @@ const ExtractedTextDisplay = ({ analysisResults, showFullText, setShowFullText }
           {showFullText
             ? analysisResults.file_info.resume_text
             : analysisResults.file_info.resume_text.slice(0, 1000) +
-              (analysisResults.file_info.resume_text.length > 1000 ? '...' : '')
+            (analysisResults.file_info.resume_text.length > 1000 ? '...' : '')
           }
         </motion.div>
       ) : (
@@ -1368,23 +1368,23 @@ const TechnicalSkills = ({ profile }) => (
         !profile.tools?.length &&
         !profile.databases?.length) &&
         profile.skills?.length > 0 && (
-        <div>
-          <span className="text-xs text-gray-500 mb-1 block">All Skills:</span>
-          <div className="flex flex-wrap gap-1">
-            {profile.skills.map((skill, idx) => (
-              <motion.span
-                key={idx}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: idx * 0.05 }}
-                className="px-2 py-1 bg-gray-600/20 text-gray-300 text-xs rounded hover:bg-gray-600/30 transition-colors"
-              >
-                {skill}
-              </motion.span>
-            ))}
+          <div>
+            <span className="text-xs text-gray-500 mb-1 block">All Skills:</span>
+            <div className="flex flex-wrap gap-1">
+              {profile.skills.map((skill, idx) => (
+                <motion.span
+                  key={idx}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className="px-2 py-1 bg-gray-600/20 text-gray-300 text-xs rounded hover:bg-gray-600/30 transition-colors"
+                >
+                  {skill}
+                </motion.span>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
   </motion.div>
 );
@@ -1410,7 +1410,8 @@ const SkillCategory = ({ title, items, color }) => {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: idx * 0.1 }}
-            className={`px-2 py-1 ${colorClasses[color]} text-xs rounded hover:${colorClasses[color]} transition-colors`}
+            whileHover={{ scale: 1.05 }}
+            className={`px-2 py-1 ${colorClasses[color]} text-xs rounded cursor-pointer hover:${colorClasses[color]} transition-colors`}
           >
             {item}
           </motion.span>
@@ -1530,104 +1531,176 @@ const InternshipRecommendations = ({ analysisResults }) => {
   );
 };
 
-const InternshipCard = ({ rec, index }) => (
-  <motion.div
-    initial={{ opacity: 0, scale: 0.9 }}
-    animate={{ opacity: 1, scale: 1 }}
-    transition={{ delay: index * 0.1 }}
-    className="bg-gradient-to-br from-gray-800/40 to-gray-900/60 rounded-xl p-5 border border-gray-700/50 hover:border-purple-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/10"
-    whileHover={{
-      scale: 1.02,
-      y: -5,
-      boxShadow: "0 20px 25px -5px rgba(168, 85, 247, 0.1)"
-    }}
-  >
-    <div className="flex items-start justify-between mb-4">
-      <div className="flex-1">
-        <div className="flex items-center gap-2 mb-2">
-          <motion.h4
-            className="font-bold text-lg text-white leading-tight"
-            whileHover={{ color: "#a855f7" }}
-          >
-            {rec.title}
-          </motion.h4>
+// Enhanced Internship Card with Better Design and Animations
+const InternshipCard = ({ rec, index }) => {
+  const [isLiked, setIsLiked] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [showFullDescription, setShowFullDescription] = useState(false);
+
+  const matchColor = rec.matching_score >= 0.8 ? 'from-emerald-500 to-green-600' :
+    rec.matching_score >= 0.6 ? 'from-yellow-500 to-orange-500' :
+      'from-red-500 to-pink-600';
+
+  const matchText = rec.matching_score >= 0.8 ? 'Excellent Match' :
+    rec.matching_score >= 0.6 ? 'Good Match' :
+      'Partial Match';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9, rotateY: 45 }}
+      animate={{ opacity: 1, scale: 1, rotateY: 0 }}
+      transition={{
+        delay: index * 0.15,
+        duration: 0.6,
+        type: "spring",
+        stiffness: 100
+      }}
+      whileHover={{
+        scale: 1.03,
+        y: -8,
+        rotateX: 5,
+        boxShadow: "0 25px 50px -12px rgba(168, 85, 247, 0.25)"
+      }}
+      className="group relative bg-gradient-to-br from-gray-900/80 via-gray-800/60 to-gray-900/80 backdrop-blur-xl rounded-2xl overflow-hidden border border-gray-700/50 hover:border-purple-500/50 transition-all duration-500 h-fit"
+    >
+      {/* Background Gradient Animation */}
+      <motion.div
+        className="absolute inset-0 bg-gradient-to-br from-purple-600/5 via-blue-600/5 to-cyan-600/5"
+        animate={{
+          background: [
+            "linear-gradient(45deg, rgba(147, 51, 234, 0.05), rgba(59, 130, 246, 0.05), rgba(6, 182, 212, 0.05))",
+            "linear-gradient(225deg, rgba(59, 130, 246, 0.05), rgba(6, 182, 212, 0.05), rgba(147, 51, 234, 0.05))",
+            "linear-gradient(45deg, rgba(147, 51, 234, 0.05), rgba(59, 130, 246, 0.05), rgba(6, 182, 212, 0.05))"
+          ]
+        }}
+        transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+      />
+
+      {/* Header Section */}
+      <div className="relative p-6 pb-4">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 mb-3">
+              <motion.div
+                whileHover={{ rotate: 360 }}
+                transition={{ duration: 0.8 }}
+                className="p-2 bg-gradient-to-br from-purple-600/20 to-blue-600/20 rounded-xl border border-purple-500/30"
+              >
+                <Building className="w-5 h-5 text-purple-400" />
+              </motion.div>
+              <div>
+                <motion.h3
+                  className="text-xl font-bold text-white leading-tight group-hover:text-purple-300 transition-colors duration-300"
+                  whileHover={{ x: 5 }}
+                >
+                  {rec.title}
+                </motion.h3>
+                <motion.p
+                  className="text-purple-400 font-semibold text-lg"
+                  whileHover={{ x: 5 }}
+                >
+                  {rec.company}
+                </motion.p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <span className={`px-3 py-1 text-xs rounded-full ${matchColor} border`}>
+                {matchText}
+              </span>
+              <span className="px-3 py-1 bg-gray-700 text-gray-300 text-xs rounded-full">
+                {rec.domain}
+              </span>
+            </div>
+          </div>
+          <div className="text-center ml-3">
+            <motion.div
+              className="bg-gradient-to-r from-yellow-500 to-orange-500 px-3 py-2 rounded-lg mb-1"
+              whileHover={{ scale: 1.1 }}
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              <Star className="w-4 h-4 text-white mx-auto mb-1" />
+              <span className="font-bold text-white text-sm">
+                {(rec.matching_score * 100).toFixed(0)}%
+              </span>
+            </motion.div>
+            <div className="text-xs text-green-400 font-medium">Match</div>
+          </div>
         </div>
-        <motion.span
-          className="px-2 py-1 bg-blue-600/20 text-blue-300 text-xs rounded-md font-medium mb-2 inline-block"
+      </div>
+
+      {/* Body Section */}
+      <div className="p-6 pt-0">
+        <div className="space-y-4 mb-4">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-400">Location:</span>
+            <span className="text-gray-300">{rec.location || 'Remote'}</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-400">Duration:</span>
+            <span className="text-gray-300">{rec.duration || 'N/A'}</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-400">Stipend:</span>
+            <span className="text-gray-300">{rec.stipend || 'Unpaid'}</span>
+          </div>
+        </div>
+
+        <motion.button
           whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setShowFullDescription(!showFullDescription)}
+          className="w-full px-4 py-2 bg-gray-800/30 hover:bg-gray-800/50 rounded-lg text-sm flex items-center justify-center gap-2 transition-all"
         >
-          {rec.domain}
-        </motion.span>
-        <div className="text-purple-400 font-semibold text-base mb-2">{rec.company}</div>
-        <div className="flex flex-wrap gap-2 text-xs text-gray-400 mb-3">
-          {rec.location && (
-            <span className="flex items-center bg-gray-700/30 px-2 py-1 rounded">
-              <MapPin className="w-3 h-3 mr-1" />
-              {rec.location}
-            </span>
-          )}
-          {rec.duration && (
-            <span className="flex items-center bg-gray-700/30 px-2 py-1 rounded">
-              <Clock className="w-3 h-3 mr-1" />
-              {rec.duration}
-            </span>
-          )}
-        </div>
+          {showFullDescription ? 'Hide Details' : 'View Details'}
+          <ChevronDown className={`w-4 h-4 transition-transform ${showFullDescription ? 'rotate-180' : ''}`} />
+        </motion.button>
       </div>
-      <div className="text-center ml-3">
-        <motion.div
-          className="bg-gradient-to-r from-yellow-500 to-orange-500 px-3 py-2 rounded-lg mb-1"
-          whileHover={{ scale: 1.1 }}
-          animate={{ scale: [1, 1.05, 1] }}
-          transition={{ duration: 2, repeat: Infinity }}
-        >
-          <Star className="w-4 h-4 text-white mx-auto mb-1" />
-          <span className="font-bold text-white text-sm">
-            {(rec.matching_score * 100).toFixed(0)}%
-          </span>
-        </motion.div>
-        <div className="text-xs text-green-400 font-medium">Match</div>
-      </div>
-    </div>
 
-    {rec.stipend && (
-      <div className="mb-3 p-2 bg-green-600/10 border border-green-600/20 rounded-lg">
-        <div className="flex items-center text-green-400 text-sm font-medium">
-          <span className="mr-1">💰</span>
-          {rec.stipend}
-        </div>
-      </div>
-    )}
+      {/* Description Section */}
+      {showFullDescription && (
+        <div className="p-6 pt-0 bg-gray-800/30 rounded-b-lg border-t border-gray-700/50">
+          <h4 className="text-sm font-medium text-gray-400 mb-3">Job Description</h4>
+          <p className="text-sm text-gray-300 leading-relaxed mb-4">
+            {rec.justification || 'No description provided.'}
+          </p>
 
-    <p className="text-gray-300 text-sm mb-4 leading-relaxed line-clamp-3">
-      {rec.justification}
-    </p>
+          <div className="space-y-2">
+            <SkillList title="Required Skills" skills={rec.requirements} color="emerald" maxVisible={3} />
+            {rec.preferred_skills?.length > 0 && (
+              <SkillList title="Preferred Skills" skills={rec.preferred_skills} color="blue" maxVisible={2} />
+            )}
+          </div>
 
-    <div className="space-y-3">
-      <SkillList title="Required Skills" skills={rec.requirements} color="emerald" maxVisible={3} />
-
-      {rec.preferred_skills?.length > 0 && (
-        <SkillList title="Preferred" skills={rec.preferred_skills} color="blue" maxVisible={2} />
-      )}
-    </div>
-
-    <div className="mt-4 pt-3 border-t border-gray-700/30 flex items-center justify-between">
-      {rec.application_deadline && (
-        <div className="text-xs text-orange-400 flex items-center">
-          <Calendar className="w-3 h-3 mr-1" />
-          Apply by: {rec.application_deadline}
+          <div className="mt-4 flex gap-2">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setIsLiked(!isLiked)}
+              className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2
+                ${isLiked ? 'bg-red-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}
+              `}
+            >
+              {isLiked ? <Heart className="w-4 h-4" /> : <Heart className="w-4 h-4 text-red-400" />}
+              {isLiked ? 'Liked' : 'Like'}
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setIsBookmarked(!isBookmarked)}
+              className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2
+                ${isBookmarked ? 'bg-yellow-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}
+              `}
+            >
+              {isBookmarked ? <BookmarkPlus className="w-4 h-4" /> : <BookmarkPlus className="w-4 h-4 text-yellow-400" />}
+              {isBookmarked ? 'Bookmarked' : 'Bookmark'}
+            </motion.button>
+          </div>
         </div>
       )}
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded-md font-medium transition-colors ml-auto"
-      >
-        View Details
-      </motion.button>
-    </div>
-  </motion.div>
-);
+    </motion.div>
+  );
+};
 
 const SkillList = ({ title, skills, color, maxVisible }) => {
   if (!skills?.length) return null;
@@ -1788,7 +1861,7 @@ const ExtractionDetails = ({ analysisResults }) => {
           />
 
           <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50">
-            <p className="text-gray-400 text-xs">AI Processing</p>
+            <p className="text-gray-400 text-xs mb-1">AI Processing</p>
             <div className="text-sm space-y-1">
               <div className="text-green-400">✓ Text Extracted</div>
               <div className="text-green-400">✓ Patterns Detected</div>
@@ -1797,7 +1870,7 @@ const ExtractionDetails = ({ analysisResults }) => {
           </div>
 
           <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50">
-            <p className="text-gray-400 text-xs">Sections Found</p>
+            <p className="text-gray-400 text-xs mb-1">Sections Found</p>
             <div className="text-xs">
               <span className="text-purple-400 font-mono">
                 {extraction.sections_detected?.length || 0} sections
@@ -1896,7 +1969,7 @@ const InfoItem = ({ label, value, capitalize }) => (
   </div>
 );
 
-const Sidebar = ({ analysisResults, recentActivity, showAgentComm, setShowAgentComm }) => {
+const Sidebar = ({ analysisResults, recentActivity, showAgentComm, setShowAgentComm, setAnalysisResults }) => {
   return (
     <div className="space-y-6">
       <ProgressCard recentActivity={recentActivity} analysisResults={analysisResults} />
@@ -1911,6 +1984,7 @@ const Sidebar = ({ analysisResults, recentActivity, showAgentComm, setShowAgentC
         analysisResults={analysisResults}
         showAgentComm={showAgentComm}
         setShowAgentComm={setShowAgentComm}
+        setAnalysisResults={setAnalysisResults}
       />
     </div>
   );
@@ -2008,7 +2082,7 @@ const ProgressCard = ({ recentActivity, analysisResults }) => {
                     <div className="text-xs text-blue-200">
                       Success Rate: {Math.round(
                         (analysisResults.agent_communications.filter(c => c.status === 'success' || c.status === 'completed').length /
-                         analysisResults.agent_communications.length) * 100
+                          analysisResults.agent_communications.length) * 100
                       )}%
                     </div>
                   </div>
@@ -2193,7 +2267,7 @@ const AIInsightsCard = ({ analysisResults }) => {
   );
 };
 
-const QuickActionsCard = ({ analysisResults, showAgentComm, setShowAgentComm }) => {
+const QuickActionsCard = ({ analysisResults, showAgentComm, setShowAgentComm, setAnalysisResults }) => {
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
