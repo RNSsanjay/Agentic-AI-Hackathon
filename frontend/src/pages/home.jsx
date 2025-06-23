@@ -1,55 +1,101 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../contexts/AuthContext';
 import {
   FileText, Brain, Target, BarChart3, Upload, Github, Clock,
-  AlertCircle, Star, CheckCircle, User, Award, TrendingUp, RefreshCw
+  AlertCircle, Star, CheckCircle, User, Award, TrendingUp, RefreshCw,
+  Eye, EyeOff, MessageSquare, Activity, Zap, ChevronDown, ChevronUp,
+  Code, Database, Globe, Briefcase, Mail, Phone, MapPin,
+  Calendar, ExternalLink, Copy, Download, Share2
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import axios from 'axios';
 
+// Constants
+const AVAILABLE_DOMAINS = [
+  'Web Development', 'Data Science', 'Mobile Development', 'Backend Development',
+  'Frontend Development', 'Artificial Intelligence', 'Machine Learning', 'Cloud Computing',
+  'Cybersecurity', 'DevOps', 'Game Development', 'Blockchain', 'IoT (Internet of Things)',
+  'UI/UX Design', 'Quality Assurance', 'Database Administration', 'Network Engineering',
+  'Product Management', 'Digital Marketing', 'Financial Technology'
+];
+
+const QUICK_ACTIONS = [
+  {
+    title: 'Resume Analysis',
+    description: 'AI-powered comprehensive resume analysis',
+    icon: <Brain className="w-8 h-8" />,
+    color: 'from-purple-600 to-blue-600',
+    onClick: () => document.getElementById('resume-upload')?.click()
+  },
+  {
+    title: 'Smart Skill Mapping',
+    description: 'Automatic skill extraction and mapping',
+    icon: <Target className="w-8 h-8" />,
+    color: 'from-green-600 to-teal-600',
+    onClick: () => toast.info('Skill mapping included in resume analysis')
+  },
+  {
+    title: 'Portfolio Intelligence',
+    description: 'AI-driven portfolio gap analysis',
+    icon: <Award className="w-8 h-8" />,
+    color: 'from-orange-600 to-red-600',
+    onClick: () => toast.info('Portfolio analysis included in resume analysis')
+  },
+  {
+    title: 'Readiness Score',
+    description: 'Comprehensive internship readiness evaluation',
+    icon: <CheckCircle className="w-8 h-8" />,
+    color: 'from-pink-600 to-purple-600',
+    onClick: () => toast.info('Readiness score included in resume analysis')
+  }
+];
+
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.2
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: { duration: 0.5, ease: "easeOut" }
+  }
+};
+
+const pulseVariants = {
+  pulse: {
+    scale: [1, 1.05, 1],
+    transition: { duration: 2, repeat: Infinity }
+  }
+};
+
 const Home = () => {
+  // State management
   const { user } = useAuth();
   const [analysisResults, setAnalysisResults] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [uploadedResume, setUploadedResume] = useState(null);
-  const [preferences, setPreferences] = useState('["Web Development", "Data Science"]');
+  const [selectedPreferences, setSelectedPreferences] = useState(['Web Development', 'Data Science']);
   const [error, setError] = useState('');
   const [analysisStep, setAnalysisStep] = useState('');
   const [progress, setProgress] = useState(0);
+  const [showAgentComm, setShowAgentComm] = useState(false);
+  const [expandedAgent, setExpandedAgent] = useState(null);
+  const [showFullText, setShowFullText] = useState(false);
+  const [copiedText, setCopiedText] = useState(false);
 
-  const quickActions = [
-    {
-      title: 'Resume Analysis',
-      description: 'AI-powered comprehensive resume analysis',
-      icon: <Brain className="w-8 h-8" />,
-      color: 'from-purple-600 to-blue-600',
-      onClick: () => document.getElementById('resume-upload').click()
-    },
-    {
-      title: 'Smart Skill Mapping',
-      description: 'Automatic skill extraction and mapping',
-      icon: <Target className="w-8 h-8" />,
-      color: 'from-green-600 to-teal-600',
-      onClick: () => toast.info('Skill mapping included in resume analysis')
-    },
-    {
-      title: 'Portfolio Intelligence',
-      description: 'AI-driven portfolio gap analysis',
-      icon: <Award className="w-8 h-8" />,
-      color: 'from-orange-600 to-red-600',
-      onClick: () => toast.info('Portfolio analysis included in resume analysis')
-    },
-    {
-      title: 'Readiness Score',
-      description: 'Comprehensive internship readiness evaluation',
-      icon: <CheckCircle className="w-8 h-8" />,
-      color: 'from-pink-600 to-purple-600',
-      onClick: () => toast.info('Readiness score included in resume analysis')
-    }
-  ];
-
+  // Derived state
   const recentActivity = analysisResults ? [
     {
       title: 'Resume analyzed',
@@ -111,11 +157,12 @@ const Home = () => {
     { label: 'Portfolio Gaps', value: '0', change: 'Analysis pending', icon: <AlertCircle className="w-5 h-5" />, color: 'text-gray-400' }
   ];
 
+  // Helper functions
   const validateFile = (file) => {
     const errors = [];
     if (!file) errors.push('Please select a file');
-    if (file && !['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(file.type)) {
-      errors.push('File must be a DOC or DOCX document');
+    if (file && !['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/pdf'].includes(file.type)) {
+      errors.push('File must be a DOC, DOCX or PDF document');
     }
     if (file && file.size > 5 * 1024 * 1024) errors.push('File size must be less than 5MB');
     if (file && file.size < 1024) errors.push('File seems too small to be a valid resume');
@@ -123,44 +170,47 @@ const Home = () => {
   };
 
   const validatePreferences = (prefs) => {
-    try {
-      const parsed = JSON.parse(prefs || '[]');
-      if (!Array.isArray(parsed)) throw new Error('Preferences must be an array');
-      return parsed.filter(p => typeof p === 'string' && p.trim());
-    } catch {
-      return [];
-    }
+    return Array.isArray(prefs) && prefs.length > 0 &&
+           prefs.every(pref => typeof pref === 'string' && pref.trim().length > 0);
+  };
+
+  const handlePreferenceToggle = (domain) => {
+    setSelectedPreferences(prev =>
+      prev.includes(domain)
+        ? prev.filter(p => p !== domain)
+        : [...prev, domain]
+    );
   };
 
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     const fileErrors = validateFile(file);
+
     if (fileErrors.length > 0) {
       setError(fileErrors.join('. '));
       toast.error(fileErrors[0]);
       return;
     }
+
     setUploadedResume(file);
     setError('');
     await analyzeResume(file);
   };
 
   const analyzeResume = async (file) => {
+    if (!validatePreferences(selectedPreferences)) {
+      setError('Please select at least one domain preference');
+      toast.error('Please select at least one domain preference');
+      return;
+    }
+
     setIsAnalyzing(true);
     setError('');
     setProgress(0);
 
-    const validatedPrefs = validatePreferences(preferences);
-    if (!validatedPrefs.length) {
-      setError('Please provide valid preferences in JSON array format');
-      toast.error('Invalid preferences format');
-      setIsAnalyzing(false);
-      return;
-    }
-
     const formData = new FormData();
     formData.append('resume', file);
-    formData.append('preferences', JSON.stringify(validatedPrefs));
+    formData.append('preferences', JSON.stringify(selectedPreferences));
 
     const steps = [
       'Uploading resume...',
@@ -199,56 +249,60 @@ const Home = () => {
       );
 
       clearInterval(stepInterval);
-
-      if (response.data.error) {
-        throw new Error(response.data.error);
-      }
-
-      setAnalysisStep(response.data.current_step || 'Analysis complete!');
-      setProgress(100);
-      setAnalysisResults(response.data);
-      toast.success('Resume analyzed successfully!');
-
-      if (response.data.detailed_extraction) {
-        const extraction = response.data.detailed_extraction;
-        const info = [
-          `${extraction.total_words} words processed`,
-          `${response.data.internship_recommendations?.length || 0} internships matched`,
-          `${extraction.sections_detected?.length || 0} resume sections detected`,
-          response.data.extraction_info.email_found ? '✓ Contact info found' : '⚠️ Add contact information'
-        ].filter(Boolean);
-
-        setTimeout(() => {
-          toast.info(`Analysis summary: ${info.join(' • ')}`);
-        }, 1000);
-      }
-
+      processAnalysisResults(response.data);
     } catch (err) {
       clearInterval(stepInterval);
-
-      let errorMessage = 'Analysis failed. Please try again.';
-
-      if (err.response?.status === 400) {
-        errorMessage = err.response.data.error || 'Invalid file or data format';
-      } else if (err.response?.status === 503) {
-        errorMessage = 'AI service temporarily unavailable';
-      } else if (err.code === 'ECONNABORTED') {
-        errorMessage = 'Analysis timeout. Please try with a smaller file.';
-      } else {
-        errorMessage = err.response?.data?.error || err.message || 'Unknown error occurred';
-      }
-
-      setError(errorMessage);
-      toast.error(`Error: ${errorMessage}`);
-
-      if (err.response?.data?.debug_info) {
-        console.error('Debug info:', err.response.data.debug_info);
-      }
-
-      setProgress(0);
+      handleAnalysisError(err);
     } finally {
       setIsAnalyzing(false);
       setTimeout(() => setAnalysisStep(''), 3000);
+    }
+  };
+
+  const processAnalysisResults = (data) => {
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    setAnalysisStep(data.current_step || 'Analysis complete!');
+    setProgress(100);
+    setAnalysisResults(data);
+    toast.success('Resume analyzed successfully!');
+
+    if (data.detailed_extraction) {
+      const extraction = data.detailed_extraction;
+      const info = [
+        `${extraction.total_words} words processed`,
+        `${data.internship_recommendations?.length || 0} internships matched`,
+        `${extraction.sections_detected?.length || 0} resume sections detected`,
+        data.extraction_info?.email_found ? '✓ Contact info found' : '⚠️ Add contact information'
+      ].filter(Boolean);
+
+      setTimeout(() => {
+        toast.info(`Analysis summary: ${info.join(' • ')}`);
+      }, 1000);
+    }
+  };
+
+  const handleAnalysisError = (err) => {
+    let errorMessage = 'Analysis failed. Please try again.';
+
+    if (err.response?.status === 400) {
+      errorMessage = err.response.data.error || 'Invalid file or data format';
+    } else if (err.response?.status === 503) {
+      errorMessage = 'AI service temporarily unavailable';
+    } else if (err.code === 'ECONNABORTED') {
+      errorMessage = 'Analysis timeout. Please try with a smaller file.';
+    } else {
+      errorMessage = err.response?.data?.error || err.message || 'Unknown error occurred';
+    }
+
+    setError(errorMessage);
+    toast.error(`Error: ${errorMessage}`);
+    setProgress(0);
+
+    if (err.response?.data?.debug_info) {
+      console.error('Debug info:', err.response.data.debug_info);
     }
   };
 
@@ -264,595 +318,1960 @@ const Home = () => {
     setAnalysisResults(null);
     setUploadedResume(null);
     setError('');
-    setPreferences('["Web Development", "Data Science"]');
+    setSelectedPreferences(['Web Development', 'Data Science']);
+  };
+
+  const getStatusIcon = (status) => {
+    const icons = {
+      success: <CheckCircle className="w-4 h-4 text-green-400" />,
+      completed: <CheckCircle className="w-4 h-4 text-green-400" />,
+      processing: <Activity className="w-4 h-4 text-blue-400 animate-pulse" />,
+      started: <Activity className="w-4 h-4 text-blue-400 animate-pulse" />,
+      failed: <AlertCircle className="w-4 h-4 text-red-400" />,
+      fallback: <AlertCircle className="w-4 h-4 text-yellow-400" />,
+      warning: <AlertCircle className="w-4 h-4 text-yellow-400" />
+    };
+    return icons[status] || <Clock className="w-4 h-4 text-gray-400" />;
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      success: 'text-green-400 bg-green-900/20 border-green-500/30',
+      completed: 'text-green-400 bg-green-900/20 border-green-500/30',
+      processing: 'text-blue-400 bg-blue-900/20 border-blue-500/30',
+      started: 'text-blue-400 bg-blue-900/20 border-blue-500/30',
+      failed: 'text-red-400 bg-red-900/20 border-red-500/30',
+      fallback: 'text-yellow-400 bg-yellow-900/20 border-yellow-500/30',
+      warning: 'text-yellow-400 bg-yellow-900/20 border-yellow-500/30'
+    };
+    return colors[status] || 'text-gray-400 bg-gray-900/20 border-gray-500/30';
+  };
+
+  const groupCommunicationsByAgent = (communications) => {
+    if (!communications) return {};
+    return communications.reduce((acc, comm) => {
+      if (!acc[comm.agent]) {
+        acc[comm.agent] = [];
+      }
+      acc[comm.agent].push(comm);
+      return acc;
+    }, {});
+  };
+
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedText(true);
+      toast.success('Resume text copied to clipboard!');
+      setTimeout(() => setCopiedText(false), 2000);
+    } catch (err) {
+      toast.error('Failed to copy text');
+    }
+  };
+
+  const downloadAnalysis = () => {
+    if (!analysisResults) return;
+
+    const data = {
+      profile: analysisResults.student_profile,
+      recommendations: analysisResults.internship_recommendations,
+      gaps: analysisResults.portfolio_gaps,
+      timestamp: new Date().toISOString()
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `internai-analysis-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Analysis downloaded successfully!');
   };
 
   return (
     <div className="min-h-screen bg-black text-white">
       <Navbar />
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
-        >
-          <h2 className="text-4xl font-bold mb-2">
-            Welcome to InternAI, {user?.first_name || 'Student'}! 🤖
-          </h2>
-          <p className="text-blue-400 text-lg">
-            AI-powered resume analysis for internship matching.
-          </p>
-        </motion.div>
+      <motion.div
+        className="max-w-7xl mx-auto px-6 py-8"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        <WelcomeSection user={user} />
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+        <StatsSection stats={stats} />
+
+        <div className="grid lg:grid-cols-4 gap-8">
+          <MainContent
+            analysisResults={analysisResults}
+            isAnalyzing={isAnalyzing}
+            uploadedResume={uploadedResume}
+            selectedPreferences={selectedPreferences}
+            error={error}
+            analysisStep={analysisStep}
+            progress={progress}
+            showAgentComm={showAgentComm}
+            expandedAgent={expandedAgent}
+            showFullText={showFullText}
+            copiedText={copiedText}
+            availableDomains={AVAILABLE_DOMAINS}
+            quickActions={QUICK_ACTIONS}
+            recentActivity={recentActivity}
+            handlePreferenceToggle={handlePreferenceToggle}
+            handleFileUpload={handleFileUpload}
+            retryAnalysis={retryAnalysis}
+            resetAnalysis={resetAnalysis}
+            setShowAgentComm={setShowAgentComm}
+            setExpandedAgent={setExpandedAgent}
+            setShowFullText={setShowFullText}
+            copyToClipboard={copyToClipboard}
+            downloadAnalysis={downloadAnalysis}
+            getStatusIcon={getStatusIcon}
+            getStatusColor={getStatusColor}
+            groupCommunicationsByAgent={groupCommunicationsByAgent}
+          />
+
+          <Sidebar
+            analysisResults={analysisResults}
+            recentActivity={recentActivity}
+            showAgentComm={showAgentComm}
+            setShowAgentComm={setShowAgentComm}
+          />
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+const WelcomeSection = ({ user }) => (
+  <motion.div variants={itemVariants} className="mb-8">
+    <h2 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+      Welcome to InternAI, {user?.first_name || 'Student'}! 🤖
+    </h2>
+    <p className="text-blue-400 text-lg">
+      AI-powered resume analysis for intelligent internship matching.
+    </p>
+  </motion.div>
+);
+
+const StatsSection = ({ stats }) => (
+  <motion.div
+    variants={itemVariants}
+    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+  >
+    {stats.map((stat, index) => (
+      <motion.div
+        key={index}
+        whileHover={{ scale: 1.02, y: -2 }}
+        className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-4 hover:bg-gray-800/20 transition-all duration-300 hover:border-blue-500/30"
+      >
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-medium text-gray-400">{stat.label}</h3>
+          <motion.div
+            className={stat.color}
+            animate={stat.value !== '0' && stat.value !== '0%' ? "pulse" : ""}
+            variants={pulseVariants}
+          >
+            {stat.icon}
+          </motion.div>
+        </div>
+        <div className="flex items-end justify-between">
+          <p className="text-2xl font-bold">{stat.value}</p>
+          <span className="text-green-500 text-sm">{stat.change}</span>
+        </div>
+      </motion.div>
+    ))}
+  </motion.div>
+);
+
+const MainContent = ({
+  analysisResults,
+  isAnalyzing,
+  uploadedResume,
+  selectedPreferences,
+  error,
+  analysisStep,
+  progress,
+  showAgentComm,
+  expandedAgent,
+  showFullText,
+  copiedText,
+  availableDomains,
+  quickActions,
+  recentActivity,
+  handlePreferenceToggle,
+  handleFileUpload,
+  retryAnalysis,
+  resetAnalysis,
+  setShowAgentComm,
+  setExpandedAgent,
+  setShowFullText,
+  copyToClipboard,
+  downloadAnalysis,
+  getStatusIcon,
+  getStatusColor,
+  groupCommunicationsByAgent
+}) => {
+  return (
+    <div className="lg:col-span-3 space-y-6">
+      {!analysisResults ? (
+        <UploadSection
+          isAnalyzing={isAnalyzing}
+          selectedPreferences={selectedPreferences}
+          error={error}
+          analysisStep={analysisStep}
+          progress={progress}
+          availableDomains={availableDomains}
+          quickActions={quickActions}
+          handlePreferenceToggle={handlePreferenceToggle}
+          handleFileUpload={handleFileUpload}
+          retryAnalysis={retryAnalysis}
+        />
+      ) : (
+        <ResultsSection
+          analysisResults={analysisResults}
+          showAgentComm={showAgentComm}
+          expandedAgent={expandedAgent}
+          showFullText={showFullText}
+          copiedText={copiedText}
+          recentActivity={recentActivity}
+          setShowAgentComm={setShowAgentComm}
+          setExpandedAgent={setExpandedAgent}
+          setShowFullText={setShowFullText}
+          copyToClipboard={copyToClipboard}
+          downloadAnalysis={downloadAnalysis}
+          resetAnalysis={resetAnalysis}
+          getStatusIcon={getStatusIcon}
+          getStatusColor={getStatusColor}
+          groupCommunicationsByAgent={groupCommunicationsByAgent}
+        />
+      )}
+    </div>
+  );
+};
+
+const UploadSection = ({
+  isAnalyzing,
+  selectedPreferences,
+  error,
+  analysisStep,
+  progress,
+  availableDomains,
+  quickActions,
+  handlePreferenceToggle,
+  handleFileUpload,
+  retryAnalysis
+}) => {
+  return (
+    <motion.div variants={itemVariants} className="mb-8">
+      <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-8 hover:border-blue-500/30 transition-all duration-300">
+        <div className="text-center mb-6">
+          <motion.div
+            animate={{ rotate: [0, 360] }}
+            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          >
+            <Brain className="w-16 h-16 mx-auto text-blue-400 mb-4" />
+          </motion.div>
+          <h3 className="text-2xl font-bold mb-2">AI-Powered Resume Analysis</h3>
+          <p className="text-gray-400">
+            Upload your resume and select preferred domains for personalized internship matching.
+          </p>
+        </div>
+
+        <div className="space-y-6">
+          <DomainPreferences
+            selectedPreferences={selectedPreferences}
+            availableDomains={availableDomains}
+            handlePreferenceToggle={handlePreferenceToggle}
+          />
+
+          <motion.label
+            whileHover={{ scale: 1.02 }}
+            className="border-2 border-dashed border-gray-700 rounded-lg p-6 text-center hover:border-blue-500 transition-all duration-300 block cursor-pointer group"
+          >
+            <input
+              id="resume-upload"
+              type="file"
+              accept=".doc,.docx,.pdf"
+              onChange={handleFileUpload}
+              className="hidden"
+              disabled={isAnalyzing}
+            />
+            <div className="space-y-2">
+              <motion.div
+                className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg text-white font-semibold hover:from-blue-700 hover:to-purple-700 transition-all disabled:opacity-50 group-hover:shadow-lg group-hover:shadow-blue-500/25"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                {isAnalyzing ? (
+                  <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
+                ) : (
+                  <Upload className="w-5 h-5 mr-2" />
+                )}
+                {isAnalyzing ? 'Processing with AI...' : 'Upload Resume'}
+              </motion.div>
+              <p className="text-sm text-gray-400">
+                Max 5MB, DOC/DOCX/PDF only. Our AI will extract and analyze everything.
+              </p>
+            </div>
+          </motion.label>
+
+          {error && (
+            <ErrorDisplay error={error} retryAnalysis={retryAnalysis} />
+          )}
+
+          {isAnalyzing && (
+            <ProgressDisplay analysisStep={analysisStep} progress={progress} />
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+const DomainPreferences = ({ selectedPreferences, availableDomains, handlePreferenceToggle }) => (
+  <div>
+    <label className="block text-sm font-medium text-gray-300 mb-3">
+      Select Your Domain Preferences ({selectedPreferences.length} selected)
+    </label>
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-4 bg-gray-800/30 rounded-lg border border-gray-700">
+      {availableDomains.map((domain) => (
+        <button
+          key={domain}
+          onClick={() => handlePreferenceToggle(domain)}
+          className={`p-2 text-xs rounded-lg transition-all ${
+            selectedPreferences.includes(domain)
+              ? 'bg-blue-600 text-white border-blue-500'
+              : 'bg-gray-700/50 text-gray-300 border-gray-600 hover:bg-gray-600/50'
+          } border`}
         >
-          {stats.map((stat, index) => (
-            <div
-              key={index}
-              className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-4 hover:bg-gray-800/20 transition-colors"
+          {domain}
+        </button>
+      ))}
+    </div>
+    <p className="text-xs text-gray-500 mt-2">
+      Select multiple domains to get diverse internship recommendations
+    </p>
+
+    {selectedPreferences.length > 0 && (
+      <div className="mt-4">
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Selected Preferences:
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {selectedPreferences.map((pref, idx) => (
+            <span
+              key={idx}
+              className="px-3 py-1 bg-blue-600/20 text-blue-300 text-sm rounded-full flex items-center gap-2"
             >
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium text-gray-400">{stat.label}</h3>
-                <div className={stat.color}>{stat.icon}</div>
-              </div>
-              <div className="flex items-end justify-between">
-                <p className="text-2xl font-bold">{stat.value}</p>
-                <span className="text-green-500 text-sm">{stat.change}</span>
-              </div>
+              {pref}
+              <button
+                onClick={() => handlePreferenceToggle(pref)}
+                className="text-blue-400 hover:text-blue-200"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+);
+
+const ErrorDisplay = ({ error, retryAnalysis }) => (
+  <div className="mt-4 p-4 bg-red-900/20 border border-red-500/50 rounded-lg flex items-center justify-between">
+    <div className="flex items-center">
+      <AlertCircle className="w-5 h-5 text-red-400 mr-2" />
+      <p className="text-red-400">{error}</p>
+    </div>
+    <button
+      onClick={retryAnalysis}
+      className="px-3 py-1 bg-red-600/20 hover:bg-red-600/30 text-red-300 rounded text-sm"
+    >
+      Retry
+    </button>
+  </div>
+);
+
+const ProgressDisplay = ({ analysisStep, progress }) => (
+  <div className="mt-6 text-center">
+    <div className="inline-flex items-center text-blue-400 mb-3">
+      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-400 mr-3"></div>
+      <span className="font-medium">{analysisStep || 'Initializing...'}</span>
+    </div>
+    <div className="w-full bg-gray-700 rounded-full h-3 mb-2">
+      <div
+        className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+        style={{ width: `${progress}%` }}
+      ></div>
+    </div>
+    <p className="text-xs text-gray-400">
+      Processing may take up to 60 seconds.
+    </p>
+  </div>
+);
+
+const ResultsSection = ({
+  analysisResults,
+  showAgentComm,
+  expandedAgent,
+  showFullText,
+  copiedText,
+  recentActivity,
+  setShowAgentComm,
+  setExpandedAgent,
+  setShowFullText,
+  copyToClipboard,
+  downloadAnalysis,
+  resetAnalysis,
+  getStatusIcon,
+  getStatusColor,
+  groupCommunicationsByAgent
+}) => {
+  return (
+    <>
+      <AnalysisCompleteBanner
+        analysisResults={analysisResults}
+        showAgentComm={showAgentComm}
+        setShowAgentComm={setShowAgentComm}
+        downloadAnalysis={downloadAnalysis}
+        resetAnalysis={resetAnalysis}
+      />
+
+      <AgentCommunications
+        analysisResults={analysisResults}
+        showAgentComm={showAgentComm}
+        expandedAgent={expandedAgent}
+        setExpandedAgent={setExpandedAgent}
+        getStatusIcon={getStatusIcon}
+        getStatusColor={getStatusColor}
+        groupCommunicationsByAgent={groupCommunicationsByAgent}
+      />
+
+      <ResumeTextExtraction
+        analysisResults={analysisResults}
+        showFullText={showFullText}
+        copiedText={copiedText}
+        setShowFullText={setShowFullText}
+        copyToClipboard={copyToClipboard}
+      />
+
+      <ProfileSummary analysisResults={analysisResults} />
+
+      <InternshipRecommendations analysisResults={analysisResults} />
+
+      <PortfolioGaps analysisResults={analysisResults} />
+
+      <ExtractionDetails analysisResults={analysisResults} />
+    </>
+  );
+};
+
+const AnalysisCompleteBanner = ({ analysisResults, showAgentComm, setShowAgentComm, downloadAnalysis, resetAnalysis }) => (
+  <motion.div
+    initial={{ scale: 0.9 }}
+    animate={{ scale: 1 }}
+    className="bg-gradient-to-r from-green-900/20 to-blue-900/20 border border-green-500/30 rounded-xl p-4"
+  >
+    <div className="flex items-center justify-between">
+      <div className="flex items-center">
+        <motion.div
+          animate={{ rotate: [0, 360] }}
+          transition={{ duration: 2 }}
+        >
+          <CheckCircle className="w-6 h-6 text-green-400 mr-3" />
+        </motion.div>
+        <div>
+          <h3 className="font-semibold text-green-400">AI Analysis Complete!</h3>
+          <p className="text-sm text-gray-400">
+            Resume processed successfully with {analysisResults.agent_communications?.length || 5} AI agents
+          </p>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setShowAgentComm(!showAgentComm)}
+          className="px-4 py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 rounded-lg text-sm flex items-center gap-2 transition-all"
+        >
+          {showAgentComm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          {showAgentComm ? 'Hide' : 'View'} AI Logs
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={downloadAnalysis}
+          className="px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 rounded-lg text-sm flex items-center gap-2 transition-all"
+        >
+          <Download className="w-4 h-4" />
+          Export
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={resetAnalysis}
+          className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-all"
+        >
+          New Analysis
+        </motion.button>
+      </div>
+    </div>
+  </motion.div>
+);
+
+const AgentCommunications = ({
+  analysisResults,
+  showAgentComm,
+  expandedAgent,
+  setExpandedAgent,
+  getStatusIcon,
+  getStatusColor,
+  groupCommunicationsByAgent
+}) => {
+  return (
+    <AnimatePresence>
+      {showAgentComm && analysisResults.agent_communications && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-lg p-6"
+        >
+          <h3 className="text-xl font-bold mb-4 flex items-center">
+            <MessageSquare className="w-5 h-5 mr-2 text-cyan-400" />
+            AI Agent Communication Logs
+            <span className="ml-2 px-2 py-1 bg-cyan-600/20 text-cyan-300 text-xs rounded">
+              {Object.keys(groupCommunicationsByAgent(analysisResults.agent_communications)).length} Agents
+            </span>
+          </h3>
+
+          <div className="space-y-4">
+            {Object.entries(groupCommunicationsByAgent(analysisResults.agent_communications)).map(([agentName, communications]) => (
+              <AgentCommunicationItem
+                key={agentName}
+                agentName={agentName}
+                communications={communications}
+                expandedAgent={expandedAgent}
+                setExpandedAgent={setExpandedAgent}
+                getStatusIcon={getStatusIcon}
+                getStatusColor={getStatusColor}
+              />
+            ))}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+
+const AgentCommunicationItem = ({
+  agentName,
+  communications,
+  expandedAgent,
+  setExpandedAgent,
+  getStatusIcon,
+  getStatusColor
+}) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      className="border border-gray-700 rounded-lg overflow-hidden"
+    >
+      <motion.button
+        whileHover={{ backgroundColor: 'rgba(55, 65, 81, 0.7)' }}
+        onClick={() => setExpandedAgent(expandedAgent === agentName ? null : agentName)}
+        className="w-full flex items-center justify-between p-4 bg-gray-800/50 hover:bg-gray-800/70 transition-all"
+      >
+        <div className="flex items-center gap-3">
+          <motion.div
+            animate={{ rotate: expandedAgent === agentName ? 180 : 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Zap className="w-5 h-5 text-cyan-400" />
+          </motion.div>
+          <span className="font-semibold text-cyan-300">{agentName}</span>
+          <span className="text-sm text-gray-400">({communications.length} steps)</span>
+          <div className="flex gap-1">
+            {communications.map((comm, idx) => (
+              <div
+                key={idx}
+                className={`w-2 h-2 rounded-full ${
+                  comm.status === 'success' || comm.status === 'completed'
+                    ? 'bg-green-400'
+                    : comm.status === 'failed'
+                    ? 'bg-red-400'
+                    : comm.status === 'processing' || comm.status === 'started'
+                    ? 'bg-blue-400'
+                    : 'bg-yellow-400'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+        <motion.div
+          animate={{ rotate: expandedAgent === agentName ? 180 : 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <ChevronDown className="w-5 h-5 text-gray-400" />
+        </motion.div>
+      </motion.button>
+
+      <AnimatePresence>
+        {expandedAgent === agentName && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="bg-gray-900/30"
+          >
+            <div className="p-4 space-y-3 max-h-96 overflow-y-auto">
+              {communications.map((comm, idx) => (
+                <CommunicationStep
+                  key={idx}
+                  comm={comm}
+                  idx={idx}
+                  getStatusIcon={getStatusIcon}
+                  getStatusColor={getStatusColor}
+                />
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
+const CommunicationStep = ({ comm, idx, getStatusIcon, getStatusColor }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay: idx * 0.1 }}
+    className={`p-4 rounded-lg border ${getStatusColor(comm.status)}`}
+  >
+    <div className="flex items-start justify-between mb-2">
+      <div className="flex items-center gap-2">
+        {getStatusIcon(comm.status)}
+        <span className="font-medium text-sm">{comm.step}</span>
+        <span className="text-xs opacity-70">
+          {new Date(comm.timestamp).toLocaleTimeString()}
+        </span>
+      </div>
+      <span className={`px-2 py-1 text-xs rounded uppercase ${getStatusColor(comm.status)}`}>
+        {comm.status}
+      </span>
+    </div>
+
+    {comm.micro_goal && (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="mb-2 p-3 bg-gray-800/30 rounded text-sm border-l-2 border-yellow-400"
+      >
+        <span className="text-yellow-400 font-medium">🎯 Micro Goal:</span>
+        <span className="ml-2 text-gray-200">{comm.micro_goal}</span>
+      </motion.div>
+    )}
+
+    {comm.data && Object.keys(comm.data).length > 0 && (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="mt-2 p-3 bg-gray-800/20 rounded border"
+      >
+        <div className="text-xs text-gray-400 mb-2 font-medium">Processing Data:</div>
+        <div className="text-sm space-y-1 max-h-32 overflow-y-auto">
+          {Object.entries(comm.data).map(([key, value]) => (
+            <div key={key} className="flex justify-between items-start gap-2">
+              <span className="text-gray-300 capitalize text-xs">{key.replace(/_/g, ' ')}:</span>
+              <span className="text-gray-100 font-mono text-xs text-right max-w-xs break-words">
+                {typeof value === 'object'
+                  ? `${JSON.stringify(value).slice(0, 30)}...`
+                  : String(value).slice(0, 50) + (String(value).length > 50 ? '...' : '')
+                }
+              </span>
             </div>
           ))}
+        </div>
+      </motion.div>
+    )}
+  </motion.div>
+);
+
+const ResumeTextExtraction = ({
+  analysisResults,
+  showFullText,
+  copiedText,
+  setShowFullText,
+  copyToClipboard
+}) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-lg p-6"
+    >
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-xl font-bold flex items-center">
+          <FileText className="w-5 h-5 mr-2 text-green-400" />
+          Gemini AI Text Extraction
+        </h3>
+        <div className="flex gap-2">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => copyToClipboard(analysisResults.file_info?.resume_text || '')}
+            className="px-3 py-1 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 rounded text-sm flex items-center gap-1 transition-all"
+          >
+            <Copy className="w-3 h-3" />
+            {copiedText ? 'Copied!' : 'Copy'}
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowFullText(!showFullText)}
+            className="px-3 py-1 bg-gray-600/20 hover:bg-gray-600/30 text-gray-300 rounded text-sm transition-all"
+          >
+            {showFullText ? 'Collapse' : 'Expand'}
+          </motion.button>
+        </div>
+      </div>
+
+      {analysisResults.detailed_extraction && (
+        <DocumentStatistics extraction={analysisResults.detailed_extraction} />
+      )}
+
+      <ExtractedTextDisplay
+        analysisResults={analysisResults}
+        showFullText={showFullText}
+        setShowFullText={setShowFullText}
+      />
+    </motion.div>
+  );
+};
+
+const DocumentStatistics = ({ extraction }) => (
+  <div className="grid md:grid-cols-4 gap-4 mb-4">
+    <motion.div
+      whileHover={{ scale: 1.02 }}
+      className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50"
+    >
+      <p className="text-gray-400 text-xs mb-1">Document Stats</p>
+      <div className="text-sm space-y-1">
+        <div className="flex justify-between">
+          <span>Words:</span>
+          <span className="font-mono text-green-400">{extraction.total_words?.toLocaleString() || '0'}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Characters:</span>
+          <span className="font-mono text-blue-400">{extraction.total_characters?.toLocaleString() || '0'}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Paragraphs:</span>
+          <span className="font-mono text-purple-400">{extraction.paragraphs || '0'}</span>
+        </div>
+      </div>
+    </motion.div>
+
+    <motion.div
+      whileHover={{ scale: 1.02 }}
+      className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50"
+    >
+      <p className="text-gray-400 text-xs mb-1">Contact Detection</p>
+      <div className="text-sm space-y-1">
+        <div className={`flex items-center justify-between ${extraction.email_patterns_found > 0 ? 'text-green-400' : 'text-red-400'}`}>
+          <span>📧 Email:</span>
+          <span className="font-mono">{extraction.email_patterns_found || '0'}</span>
+        </div>
+        <div className={`flex items-center justify-between ${extraction.phone_patterns_found > 0 ? 'text-green-400' : 'text-red-400'}`}>
+          <span>📱 Phone:</span>
+          <span className="font-mono">{extraction.phone_patterns_found || '0'}</span>
+        </div>
+        <div className={`flex items-center justify-between ${extraction.url_patterns_found > 0 ? 'text-green-400' : 'text-gray-400'}`}>
+          <span>🔗 URLs:</span>
+          <span className="font-mono">{extraction.url_patterns_found || '0'}</span>
+        </div>
+      </div>
+    </motion.div>
+
+    <motion.div
+      whileHover={{ scale: 1.02 }}
+      className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50"
+    >
+      <p className="text-gray-400 text-xs mb-1">AI Processing</p>
+      <div className="text-sm space-y-1">
+        <div className="text-green-400">✓ Text Extracted</div>
+        <div className="text-green-400">✓ Patterns Detected</div>
+        <div className="text-green-400">✓ Structure Analyzed</div>
+      </div>
+    </motion.div>
+
+    <motion.div
+      whileHover={{ scale: 1.02 }}
+      className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50"
+    >
+      <p className="text-gray-400 text-xs mb-1">Sections Found</p>
+      <div className="text-xs">
+        <span className="text-purple-400 font-mono">
+          {extraction.sections_detected?.length || 0} sections
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-1 mt-1">
+        {extraction.sections_detected?.slice(0, 3).map((section, idx) => (
+          <span key={idx} className="px-1 py-0.5 bg-purple-600/20 text-purple-300 text-xs rounded">
+            {section}
+          </span>
+        ))}
+        {(extraction.sections_detected?.length || 0) > 3 && (
+          <span className="text-xs text-gray-400">+{extraction.sections_detected?.length - 3 || 0}</span>
+        )}
+      </div>
+    </motion.div>
+  </div>
+);
+
+const ExtractedTextDisplay = ({ analysisResults, showFullText, setShowFullText }) => (
+  <div className="bg-gray-800/30 rounded-lg border border-gray-700/50 overflow-hidden">
+    <div className="flex items-center justify-between p-3 bg-gray-800/50 border-b border-gray-700/50">
+      <h4 className="font-semibold text-gray-300 flex items-center">
+        <Brain className="w-4 h-4 mr-2 text-blue-400" />
+        Extracted Resume Content
+      </h4>
+      <span className="text-xs text-gray-400">
+        Processed by Gemini AI
+      </span>
+    </div>
+
+    <div className={`p-4 bg-gray-900/50 text-sm text-gray-300 whitespace-pre-wrap font-mono leading-relaxed ${
+      showFullText ? 'max-h-none' : 'max-h-64'
+    } overflow-y-auto transition-all duration-300`}>
+      {analysisResults.file_info?.resume_text ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          {showFullText
+            ? analysisResults.file_info.resume_text
+            : analysisResults.file_info.resume_text.slice(0, 1000) +
+              (analysisResults.file_info.resume_text.length > 1000 ? '...' : '')
+          }
         </motion.div>
+      ) : (
+        <div className="text-gray-500 italic text-center py-8">
+          No resume text extracted. Please try uploading a different file.
+        </div>
+      )}
+    </div>
 
-        <div className="grid lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
-            {!analysisResults && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="mb-8"
+    {!showFullText && analysisResults.file_info?.resume_text?.length > 1000 && (
+      <div className="p-3 bg-gray-800/30 border-t border-gray-700/50 text-center">
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          onClick={() => setShowFullText(true)}
+          className="text-blue-400 hover:text-blue-300 text-sm transition-colors"
+        >
+          Show full content ({(analysisResults.file_info.resume_text.length - 1000).toLocaleString()} more characters)
+        </motion.button>
+      </div>
+    )}
+  </div>
+);
+
+const ProfileSummary = ({ analysisResults }) => {
+  const profile = analysisResults.student_profile || {};
+  const extraction = analysisResults.detailed_extraction || {};
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.1 }}
+      className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-lg p-6"
+    >
+      <h3 className="text-xl font-bold mb-4 flex items-center">
+        <User className="w-5 h-5 mr-2 text-blue-400" />
+        AI-Enhanced Profile Summary
+        <span className="ml-2 px-2 py-1 bg-blue-600/20 text-blue-300 text-xs rounded">
+          {Math.round(((profile.skills?.length || 0) / 25) * 100)}% Complete
+        </span>
+      </h3>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <div className="space-y-4">
+          <PersonalInformation profile={profile} />
+          <ContactInformation profile={profile} />
+          {hasOnlineProfiles(profile) && <OnlineProfiles profile={profile} />}
+        </div>
+
+        <div className="space-y-4">
+          <TechnicalSkills profile={profile} />
+          {profile.education?.length > 0 && <Education profile={profile} />}
+          {profile.summary && <ProfessionalSummary profile={profile} />}
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+const PersonalInformation = ({ profile }) => (
+  <motion.div
+    whileHover={{ scale: 1.01 }}
+    className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/50"
+  >
+    <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center">
+      <User className="w-4 h-4 mr-2" />
+      Personal Information
+    </h4>
+    <div className="space-y-2">
+      <div>
+        <span className="text-xs text-gray-500">Name:</span>
+        <p className="font-semibold text-lg">{profile.name || 'Not detected'}</p>
+      </div>
+      <div>
+        <span className="text-xs text-gray-500">Experience Level:</span>
+        <p className="font-semibold capitalize text-green-400">
+          {profile.experience_level || 'Entry-level'}
+          {profile.years_of_experience &&
+            ` (${profile.years_of_experience})`}
+        </p>
+      </div>
+    </div>
+  </motion.div>
+);
+
+const ContactInformation = ({ profile }) => (
+  <motion.div
+    whileHover={{ scale: 1.01 }}
+    className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/50"
+  >
+    <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center">
+      <Mail className="w-4 h-4 mr-2" />
+      Contact Information
+    </h4>
+    <div className="space-y-2 text-sm">
+      {profile.email && (
+        <div className="text-blue-300 flex items-center">
+          <Mail className="w-3 h-3 mr-1" />
+          {profile.email}
+        </div>
+      )}
+      {profile.phone && (
+        <div className="text-green-300 flex items-center">
+          <Phone className="w-3 h-3 mr-1" />
+          {profile.phone}
+        </div>
+      )}
+      {profile.education?.[0]?.institution && (
+        <div className="text-purple-300 flex items-center">
+          <Award className="w-3 h-3 mr-1" />
+          {profile.education[0].institution}
+        </div>
+      )}
+      {!profile.email && !profile.phone && (
+        <div className="text-gray-400">No contact information detected</div>
+      )}
+    </div>
+  </motion.div>
+);
+
+const hasOnlineProfiles = (profile) => {
+  return profile.linkedin || profile.github || profile.website;
+};
+
+const OnlineProfiles = ({ profile }) => (
+  <motion.div
+    whileHover={{ scale: 1.01 }}
+    className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/50"
+  >
+    <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center">
+      <Globe className="w-4 h-4 mr-2" />
+      Online Presence
+    </h4>
+    <div className="space-y-2 text-sm">
+      {profile.linkedin && (
+        <div className="flex items-center text-blue-300">
+          <Briefcase className="w-4 h-4 mr-2" />
+          LinkedIn Profile
+          <ExternalLink className="w-3 h-3 ml-1" />
+        </div>
+      )}
+      {profile.github && (
+        <div className="flex items-center text-purple-300">
+          <Github className="w-4 h-4 mr-2" />
+          GitHub Profile
+          <ExternalLink className="w-3 h-3 ml-1" />
+        </div>
+      )}
+      {profile.website && (
+        <div className="flex items-center text-green-300">
+          <Globe className="w-4 h-4 mr-2" />
+          Personal Website
+          <ExternalLink className="w-3 h-3 ml-1" />
+        </div>
+      )}
+    </div>
+  </motion.div>
+);
+
+const TechnicalSkills = ({ profile }) => (
+  <motion.div
+    whileHover={{ scale: 1.01 }}
+    className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/50"
+  >
+    <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center">
+      <Code className="w-4 h-4 mr-2" />
+      Technical Skills ({profile.skills?.length || 0} detected)
+    </h4>
+
+    <div className="space-y-3">
+      {profile.programming_languages?.length > 0 && (
+        <SkillCategory
+          title="Programming Languages"
+          items={profile.programming_languages}
+          color="blue"
+        />
+      )}
+
+      {profile.frameworks?.length > 0 && (
+        <SkillCategory
+          title="Frameworks"
+          items={profile.frameworks}
+          color="green"
+        />
+      )}
+
+      {profile.tools?.length > 0 && (
+        <SkillCategory
+          title="Tools"
+          items={profile.tools}
+          color="purple"
+        />
+      )}
+
+      {profile.databases?.length > 0 && (
+        <SkillCategory
+          title="Databases"
+          items={profile.databases}
+          color="orange"
+        />
+      )}
+
+      {(!profile.programming_languages?.length &&
+        !profile.frameworks?.length &&
+        !profile.tools?.length &&
+        !profile.databases?.length) &&
+        profile.skills?.length > 0 && (
+        <div>
+          <span className="text-xs text-gray-500 mb-1 block">All Skills:</span>
+          <div className="flex flex-wrap gap-1">
+            {profile.skills.map((skill, idx) => (
+              <motion.span
+                key={idx}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: idx * 0.05 }}
+                className="px-2 py-1 bg-gray-600/20 text-gray-300 text-xs rounded hover:bg-gray-600/30 transition-colors"
               >
-                <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-8">
-                  <div className="text-center mb-6">
-                    <Brain className="w-16 h-16 mx-auto text-blue-400 mb-4" />
-                    <h3 className="text-2xl font-bold mb-2">Resume Analysis</h3>
-                    <p className="text-gray-400">
-                      Upload your resume to match with internships.
-                    </p>
-                  </div>
-                  <div className="space-y-4">
-                    <div className="grid md:grid-cols-1 gap-4">
-                      <input
-                        type="text"
-                        value={preferences}
-                        onChange={(e) => setPreferences(e.target.value)}
-                        placeholder='["Web Development", "AI"]'
-                        className="p-2 bg-gray-800 text-white border border-gray-700 rounded-lg focus:border-blue-500"
-                      />
-                    </div>
-                    <label className="border-2 border-dashed border-gray-700 rounded-lg p-6 text-center hover:border-blue-500 transition-colors block cursor-pointer">
-                      <input
-                        id="resume-upload"
-                        type="file"
-                        accept=".doc,.docx"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                        disabled={isAnalyzing}
-                      />
-                      <div className="space-y-2">
-                        <div className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg text-white font-semibold hover:from-blue-700 hover:to-purple-700 transition-all disabled:opacity-50">
-                          {isAnalyzing ? (
-                            <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
-                          ) : (
-                            <Upload className="w-5 h-5 mr-2" />
-                          )}
-                          {isAnalyzing ? 'Processing...' : 'Upload Resume'}
-                        </div>
-                        <p className="text-sm text-gray-400">
-                          Max 5MB, DOC/DOCX only.
-                        </p>
-                      </div>
-                    </label>
-                    {error && (
-                      <div className="mt-4 p-4 bg-red-900/20 border border-red-500/50 rounded-lg flex items-center justify-between">
-                        <div className="flex items-center">
-                          <AlertCircle className="w-5 h-5 text-red-400 mr-2" />
-                          <p className="text-red-400">{error}</p>
-                        </div>
-                        <button
-                          onClick={retryAnalysis}
-                          className="px-3 py-1 bg-red-600/20 hover:bg-red-600/30 text-red-300 rounded text-sm"
-                        >
-                          Retry
-                        </button>
-                      </div>
-                    )}
-                    {isAnalyzing && (
-                      <div className="mt-6 text-center">
-                        <div className="inline-flex items-center text-blue-400 mb-3">
-                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-400 mr-3"></div>
-                          <span className="font-medium">{analysisStep || 'Initializing...'}</span>
-                        </div>
-                        <div className="w-full bg-gray-700 rounded-full h-3 mb-2">
-                          <div
-                            className="bg-blue-600 h-3 rounded-full transition-all duration-300"
-                            style={{ width: `${progress}%` }}
-                          ></div>
-                        </div>
-                        <p className="text-xs text-gray-400">
-                          Processing may take up to 60 seconds.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
+                {skill}
+              </motion.span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  </motion.div>
+);
+
+const SkillCategory = ({ title, items, color }) => {
+  const colorClasses = {
+    blue: 'bg-blue-600/20 text-blue-300 hover:bg-blue-600/30',
+    green: 'bg-green-600/20 text-green-300 hover:bg-green-600/30',
+    purple: 'bg-purple-600/20 text-purple-300 hover:bg-purple-600/30',
+    orange: 'bg-orange-600/20 text-orange-300 hover:bg-orange-600/30'
+  };
+
+  return (
+    <div>
+      <span className="text-xs text-gray-500 flex items-center mb-1">
+        {color === 'blue' && <Code className="w-3 h-3 mr-1" />}
+        {title}:
+      </span>
+      <div className="flex flex-wrap gap-1">
+        {items.map((item, idx) => (
+          <motion.span
+            key={idx}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: idx * 0.1 }}
+            className={`px-2 py-1 ${colorClasses[color]} text-xs rounded hover:${colorClasses[color]} transition-colors`}
+          >
+            {item}
+          </motion.span>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const Education = ({ profile }) => (
+  <motion.div
+    whileHover={{ scale: 1.01 }}
+    className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/50"
+  >
+    <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center">
+      <Award className="w-4 h-4 mr-2" />
+      Education
+    </h4>
+    <div className="space-y-3">
+      {profile.education.map((edu, idx) => (
+        <motion.div
+          key={idx}
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: idx * 0.1 }}
+          className="bg-gray-900/30 rounded p-3 border border-gray-700/30"
+        >
+          <div className="font-semibold text-sm">{edu.degree}</div>
+          <div className="text-sm text-gray-300">{edu.institution}</div>
+          <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
+            {edu.year && (
+              <span className="flex items-center">
+                <Calendar className="w-3 h-3 mr-1" />
+                {edu.year}
+              </span>
             )}
-            {analysisResults && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="space-y-6"
-              >
-                <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-xl p-4 flex items-center justify-between">
-                  <div className="flex items-center">
-                    <CheckCircle className="w-6 h-6 text-blue-400 mr-3" />
-                    <div>
-                      <h3 className="font-semibold text-blue-400">Analysis Complete!</h3>
-                      <p className="text-sm text-gray-400">
-                        Results generated successfully.
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={resetAnalysis}
-                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm"
-                  >
-                    New Analysis
-                  </button>
-                </div>
-
-                <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-lg p-6">
-                  <h3 className="text-xl font-bold mb-4 flex items-center">
-                    <FileText className="w-5 h-5 mr-2 text-green-400" />
-                    Resume Text Extraction
-                  </h3>
-
-                  <div className="bg-gray-800/30 rounded-lg p-4 mb-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-semibold text-gray-300">Extracted Content</h4>
-                      <span className="text-xs text-gray-400">
-                        {analysisResults.detailed_extraction?.total_characters || 0} characters
-                      </span>
-                    </div>
-                    <div className="max-h-40 overflow-y-auto bg-gray-900/50 p-3 rounded text-sm text-gray-300 whitespace-pre-wrap border">
-                      {analysisResults.file_info?.resume_text ||
-                        "Resume text will be displayed here after extraction..."}
-                    </div>
-                  </div>
-
-                  {analysisResults.detailed_extraction && (
-                    <div className="grid md:grid-cols-3 gap-4 mb-4">
-                      <div className="bg-gray-800/30 rounded-lg p-3">
-                        <p className="text-gray-400 text-xs mb-1">Document Statistics</p>
-                        <div className="text-sm space-y-1">
-                          <div className="flex justify-between">
-                            <span>Words:</span>
-                            <span className="font-mono">{analysisResults.detailed_extraction.total_words}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Characters:</span>
-                            <span className="font-mono">{analysisResults.detailed_extraction.total_characters}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Lines:</span>
-                            <span className="font-mono">{analysisResults.detailed_extraction.total_lines}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Paragraphs:</span>
-                            <span className="font-mono">{analysisResults.detailed_extraction.paragraphs}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="bg-gray-800/30 rounded-lg p-3">
-                        <p className="text-gray-400 text-xs mb-1">Contact Detection</p>
-                        <div className="text-sm space-y-1">
-                          <div className={`flex items-center justify-between ${analysisResults.detailed_extraction.email_patterns_found > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            <span>📧 Email:</span>
-                            <span className="font-mono">{analysisResults.detailed_extraction.email_patterns_found}</span>
-                          </div>
-                          <div className={`flex items-center justify-between ${analysisResults.detailed_extraction.phone_patterns_found > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            <span>📱 Phone:</span>
-                            <span className="font-mono">{analysisResults.detailed_extraction.phone_patterns_found}</span>
-                          </div>
-                          <div className={`flex items-center justify-between ${analysisResults.detailed_extraction.url_patterns_found > 0 ? 'text-green-400' : 'text-gray-400'}`}>
-                            <span>🔗 URLs:</span>
-                            <span className="font-mono">{analysisResults.detailed_extraction.url_patterns_found}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="bg-gray-800/30 rounded-lg p-3">
-                        <p className="text-gray-400 text-xs mb-1">Resume Sections</p>
-                        <div className="flex flex-wrap gap-1">
-                          {analysisResults.detailed_extraction.sections_detected?.length > 0 ? (
-                            analysisResults.detailed_extraction.sections_detected.map((section, idx) => (
-                              <span key={idx} className="px-2 py-1 bg-purple-600/20 text-purple-300 text-xs rounded">
-                                {section}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-gray-400 text-xs italic">No standard sections detected</span>
-                          )}
-                        </div>
-                        {analysisResults.detailed_extraction.sections_detected?.length > 0 && (
-                          <div className="mt-2 text-xs text-gray-400">
-                            {analysisResults.detailed_extraction.sections_detected.length} sections found
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-lg p-6">
-                  <h3 className="text-xl font-bold mb-4 flex items-center">
-                    <User className="w-5 h-5 mr-2 text-blue-400" />
-                    Profile Summary
-                  </h3>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-gray-400 text-sm">Name</p>
-                      <p className="font-semibold">{analysisResults.student_profile?.name || 'Not detected'}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-400 text-sm">Experience Level</p>
-                      <p className="font-semibold capitalize">{analysisResults.student_profile?.experience_level || 'Entry-level'}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-400 text-sm">Contact Info</p>
-                      <div className="text-sm space-y-1">
-                        {analysisResults.student_profile?.email && (
-                          <div className="text-blue-300">📧 {analysisResults.student_profile.email}</div>
-                        )}
-                        {analysisResults.student_profile?.education && (
-                          <div className="text-green-300">🎓 {analysisResults.student_profile.education}</div>
-                        )}
-                        {!analysisResults.student_profile?.email && (
-                          <div className="text-gray-400">No email detected</div>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-gray-400 text-sm">Skills ({analysisResults.student_profile?.skills?.length || 0})</p>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {analysisResults.student_profile?.skills?.slice(0, 6).map((skill, idx) => (
-                          <span key={idx} className="px-2 py-1 bg-blue-600/20 text-blue-300 text-xs rounded">
-                            {skill}
-                          </span>
-                        ))}
-                        {(analysisResults.student_profile?.skills?.length || 0) > 6 && (
-                          <span className="px-2 py-1 bg-gray-600/20 text-gray-300 text-xs rounded">
-                            +{analysisResults.student_profile.skills.length - 6} more
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {analysisResults.student_profile?.projects && analysisResults.student_profile.projects.length > 0 && (
-                      <div className="md:col-span-2">
-                        <p className="text-gray-400 text-sm">Projects ({analysisResults.student_profile.projects.length})</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {analysisResults.student_profile.projects.slice(0, 4).map((project, idx) => (
-                            <span key={idx} className="px-2 py-1 bg-green-600/20 text-green-300 text-xs rounded">
-                              {project}
-                            </span>
-                          ))}
-                          {analysisResults.student_profile.projects.length > 4 && (
-                            <span className="px-2 py-1 bg-gray-600/20 text-gray-300 text-xs rounded">
-                              +{analysisResults.student_profile.projects.length - 4} more
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {analysisResults.student_profile?.certifications && analysisResults.student_profile.certifications.length > 0 && (
-                      <div className="md:col-span-2">
-                        <p className="text-gray-400 text-sm">Certifications ({analysisResults.student_profile.certifications.length})</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {analysisResults.student_profile.certifications.map((cert, idx) => (
-                            <span key={idx} className="px-2 py-1 bg-yellow-600/20 text-yellow-300 text-xs rounded">
-                              {cert}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-lg p-6">
-                  <h3 className="text-xl font-bold mb-4 flex items-center">
-                    <Target className="w-5 h-5 mr-2 text-purple-400" />
-                    Internship Recommendations
-                  </h3>
-                  <div className="space-y-4">
-                    {analysisResults.internship_recommendations?.map((rec, index) => (
-                      <div key={index} className="bg-gray-800/30 rounded-lg p-4 hover:bg-gray-800/50 transition-colors">
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-semibold text-lg">{rec.title}</h4>
-                              <span className="px-2 py-1 bg-blue-600/20 text-blue-300 text-xs rounded">
-                                {rec.domain}
-                              </span>
-                            </div>
-                            <p className="text-purple-400 font-medium">{rec.company}</p>
-                          </div>
-                          <div className="flex items-center bg-gray-700/50 px-3 py-1 rounded-lg">
-                            <Star className="w-4 h-4 text-yellow-400 mr-1" />
-                            <span className="font-bold">{(rec.matching_score * 100).toFixed(0)}%</span>
-                          </div>
-                        </div>
-                        <p className="text-gray-300 text-sm mb-3">{rec.justification}</p>
-                        <div className="flex flex-wrap gap-2">
-                          {rec.requirements?.map((req, idx) => (
-                            <span key={idx} className="px-2 py-1 bg-emerald-600/20 text-emerald-300 text-xs rounded">
-                              {req}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-lg p-6">
-                  <h3 className="text-xl font-bold mb-4 flex items-center">
-                    <AlertCircle className="w-5 h-5 mr-2 text-red-400" />
-                    Portfolio Gaps
-                  </h3>
-                  <div className="space-y-3">
-                    {analysisResults.portfolio_gaps?.map((gap, index) => (
-                      <div key={index} className="bg-gray-800/30 rounded-lg p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <h4 className="font-semibold capitalize">{gap.gap_type} Gap</h4>
-                              <span className={`px-2 py-1 text-xs rounded-lg ${
-                                gap.priority === 'high' ? 'bg-red-600/20 text-red-300' :
-                                gap.priority === 'medium' ? 'bg-yellow-600/20 text-yellow-300' :
-                                'bg-green-600/20 text-green-300'
-                              }`}>
-                                {gap.priority} priority
-                              </span>
-                            </div>
-                            <p className="text-gray-300 text-sm mb-2">{gap.description}</p>
-                            <div className="flex items-center">
-                              <CheckCircle className="w-4 h-4 text-green-400 mr-2" />
-                              <p className="text-green-400 text-sm font-medium">{gap.suggested_action}</p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-lg p-6">
-                  <h3 className="text-xl font-bold mb-4 flex items-center">
-                    <FileText className="w-5 h-5 mr-2 text-green-400" />
-                    Extraction Details
-                  </h3>
-                  {analysisResults.detailed_extraction && (
-                    <div className="grid md:grid-cols-3 gap-4 mb-4">
-                      <div className="bg-gray-800/30 rounded-lg p-3">
-                        <p className="text-gray-400 text-xs">Document Stats</p>
-                        <div className="text-sm space-y-1">
-                          <div>{analysisResults.detailed_extraction.total_words} words</div>
-                          <div>{analysisResults.detailed_extraction.total_characters} characters</div>
-                          <div>{analysisResults.detailed_extraction.paragraphs} paragraphs</div>
-                        </div>
-                      </div>
-                      <div className="bg-gray-800/30 rounded-lg p-3">
-                        <p className="text-gray-400 text-xs">Contact Information</p>
-                        <div className="text-sm space-y-1">
-                          <div className={analysisResults.detailed_extraction.email_patterns_found > 0 ? 'text-green-400' : 'text-red-400'}>
-                            📧 {analysisResults.detailed_extraction.email_patterns_found} email(s)
-                          </div>
-                          <div className={analysisResults.detailed_extraction.phone_patterns_found > 0 ? 'text-green-400' : 'text-red-400'}>
-                            📱 {analysisResults.detailed_extraction.phone_patterns_found} phone(s)
-                          </div>
-                          <div className={analysisResults.detailed_extraction.url_patterns_found > 0 ? 'text-green-400' : 'text-gray-400'}>
-                            🔗 {analysisResults.detailed_extraction.url_patterns_found} URL(s)
-                          </div>
-                        </div>
-                      </div>
-                      <div className="bg-gray-800/30 rounded-lg p-3">
-                        <p className="text-gray-400 text-xs">Sections Found</p>
-                        <div className="flex flex-wrap gap-1">
-                          {analysisResults.detailed_extraction.sections_detected?.length > 0 ? (
-                            analysisResults.detailed_extraction.sections_detected.map((section, idx) => (
-                              <span key={idx} className="px-2 py-1 bg-purple-600/20 text-purple-300 text-xs rounded">
-                                {section}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-gray-400 text-xs">No standard sections detected</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-gray-400 text-sm">Name</p>
-                      <p className="font-semibold">{analysisResults.student_profile?.name || 'Not detected'}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-400 text-sm">Experience Level</p>
-                      <p className="font-semibold capitalize">{analysisResults.student_profile?.experience_level || 'Entry-level'}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-400 text-sm">Contact Info</p>
-                      <div className="text-sm space-y-1">
-                        {analysisResults.student_profile?.email && (
-                          <div className="text-blue-300">📧 {analysisResults.student_profile.email}</div>
-                        )}
-                        {analysisResults.student_profile?.education && (
-                          <div className="text-green-300">🎓 {analysisResults.student_profile.education}</div>
-                        )}
-                        {!analysisResults.student_profile?.email && (
-                          <div className="text-gray-400">No email detected</div>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-gray-400 text-sm">Skills ({analysisResults.student_profile?.skills?.length || 0})</p>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {analysisResults.student_profile?.skills?.slice(0, 6).map((skill, idx) => (
-                          <span key={idx} className="px-2 py-1 bg-blue-600/20 text-blue-300 text-xs rounded">
-                            {skill}
-                          </span>
-                        ))}
-                        {(analysisResults.student_profile?.skills?.length || 0) > 6 && (
-                          <span className="px-2 py-1 bg-gray-600/20 text-gray-300 text-xs rounded">
-                            +{analysisResults.student_profile.skills.length - 6} more
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-            {!analysisResults && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-              >
-                <h3 className="text-2xl font-bold mb-6">AI-Powered Features</h3>
-                <div className="grid md:grid-cols-2 gap-6">
-                  {quickActions.map((item, index) => (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.4 + index * 0.1 }}
-                      whileHover={{ scale: 1.02 }}
-                      className="group cursor-pointer"
-                      onClick={item.onClick}
-                    >
-                      <div className="block p-6 bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl hover:border-blue-500/50 transition-all">
-                        <div className={`inline-flex p-3 bg-gradient-to-r ${item.color} rounded-lg mb-4 group-hover:scale-110 transition-transform`}>
-                          <div className="text-white">{item.icon}</div>
-                        </div>
-                        <h4 className="text-xl font-semibold mb-2">{item.title}</h4>
-                        <p className="text-gray-400">{item.description}</p>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              </motion.div>
+            {edu.gpa && (
+              <span className="text-green-400 font-medium">GPA: {edu.gpa}</span>
             )}
           </div>
+        </motion.div>
+      ))}
+    </div>
+  </motion.div>
+);
 
-          <div className="space-y-6">
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.4 }}
-              className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-6"
-            >
-              <h3 className="text-lg font-semibold mb-4 flex items-center">
-                <Clock className="w-5 h-5 mr-2 text-blue-400" />
-                Analysis Progress
-              </h3>
-              <div className="space-y-3">
-                {recentActivity.map((activity, index) => (
-                  <div key={index} className="flex items-center space-x-3 p-3 bg-gray-800/30 rounded-lg">
-                    <div className={`${activity.status === 'completed' ? 'text-blue-400' : 'text-gray-400'}`}>
-                      {activity.icon}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{activity.title}</p>
-                      <p className="text-xs text-gray-400">{activity.time}</p>
-                    </div>
-                    {activity.status === 'completed' && (
-                      <CheckCircle className="w-4 h-4 text-blue-400" />
-                    )}
-                  </div>
-                ))}
-              </div>
-              {analysisResults?.detailed_extraction && (
-                <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-                  <h4 className="text-sm font-semibold text-blue-300 mb-2">Processing Summary</h4>
-                  <div className="text-xs text-blue-200 space-y-1">
-                    <div>✓ {analysisResults.detailed_extraction.total_words} words analyzed</div>
-                    <div>✓ {analysisResults.extraction_info.skills_count} skills extracted</div>
-                    <div>✓ {analysisResults.extraction_info.projects_count} projects identified</div>
-                    <div>✓ {analysisResults.internship_recommendations?.length || 0} internships matched</div>
-                    <div>✓ {analysisResults.detailed_extraction.sections_detected?.length || 0} resume sections detected</div>
-                  </div>
-                  {analysisResults.current_step && (
-                    <div className="mt-3 pt-2 border-t border-blue-500/20">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-blue-300">Status:</span>
-                        <span className="text-xs text-blue-200">{analysisResults.current_step}</span>
-                      </div>
-                      {analysisResults.step_progress && (
-                        <div className="mt-1">
-                          <div className="w-full bg-blue-900/30 rounded-full h-1">
-                            <div
-                              className="bg-blue-400 h-1 rounded-full transition-all duration-300"
-                              style={{ width: `${analysisResults.step_progress}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+const ProfessionalSummary = ({ profile }) => (
+  <motion.div
+    whileHover={{ scale: 1.01 }}
+    className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/50"
+  >
+    <h4 className="text-sm font-medium text-gray-400 mb-3">Professional Summary</h4>
+    <div className="text-sm text-gray-300 leading-relaxed italic">
+      "{profile.summary}"
+    </div>
+  </motion.div>
+);
+
+const InternshipRecommendations = ({ analysisResults }) => {
+  if (!analysisResults?.internship_recommendations?.length) {
+    return null;
+  }
+
+  const recommendations = analysisResults.internship_recommendations;
+  const averageMatch = Math.round(
+    (recommendations.reduce((acc, rec) => acc + rec.matching_score, 0) / recommendations.length) * 100
+  );
+  const uniqueDomains = new Set(recommendations.map(rec => rec.domain)).size;
+  const highMatchCount = recommendations.filter(rec => rec.matching_score >= 0.8).length;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.2 }}
+      className="col-span-full bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-lg p-6"
+    >
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-2xl font-bold flex items-center">
+          <Target className="w-6 h-6 mr-3 text-purple-400" />
+          AI-Matched Internship Recommendations
+          <span className="ml-3 px-3 py-1 bg-purple-600/20 text-purple-300 text-sm rounded-lg font-medium">
+            {recommendations.length} Found
+          </span>
+        </h3>
+        <div className="flex gap-3">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            className="px-4 py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 rounded-lg text-sm flex items-center gap-2 transition-all font-medium"
+          >
+            <Eye className="w-4 h-4" />
+            View All
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            className="px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 rounded-lg text-sm flex items-center gap-2 transition-all font-medium"
+          >
+            <Download className="w-4 h-4" />
+            Export
+          </motion.button>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
+        {recommendations.map((rec, index) => (
+          <InternshipCard key={index} rec={rec} index={index} />
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-gray-700/30">
+        <StatCard value={recommendations.length} label="Total Matches" color="purple" />
+        <StatCard value={`${averageMatch}%`} label="Avg Match" color="green" />
+        <StatCard value={uniqueDomains} label="Domains" color="blue" />
+        <StatCard value={highMatchCount} label="High Match" color="yellow" />
+      </div>
+    </motion.div>
+  );
+};
+
+const InternshipCard = ({ rec, index }) => (
+  <motion.div
+    initial={{ opacity: 0, scale: 0.9 }}
+    animate={{ opacity: 1, scale: 1 }}
+    transition={{ delay: index * 0.1 }}
+    className="bg-gradient-to-br from-gray-800/40 to-gray-900/60 rounded-xl p-5 border border-gray-700/50 hover:border-purple-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/10"
+    whileHover={{
+      scale: 1.02,
+      y: -5,
+      boxShadow: "0 20px 25px -5px rgba(168, 85, 247, 0.1)"
+    }}
+  >
+    <div className="flex items-start justify-between mb-4">
+      <div className="flex-1">
+        <div className="flex items-center gap-2 mb-2">
+          <motion.h4
+            className="font-bold text-lg text-white leading-tight"
+            whileHover={{ color: "#a855f7" }}
+          >
+            {rec.title}
+          </motion.h4>
+        </div>
+        <motion.span
+          className="px-2 py-1 bg-blue-600/20 text-blue-300 text-xs rounded-md font-medium mb-2 inline-block"
+          whileHover={{ scale: 1.05 }}
+        >
+          {rec.domain}
+        </motion.span>
+        <div className="text-purple-400 font-semibold text-base mb-2">{rec.company}</div>
+        <div className="flex flex-wrap gap-2 text-xs text-gray-400 mb-3">
+          {rec.location && (
+            <span className="flex items-center bg-gray-700/30 px-2 py-1 rounded">
+              <MapPin className="w-3 h-3 mr-1" />
+              {rec.location}
+            </span>
+          )}
+          {rec.duration && (
+            <span className="flex items-center bg-gray-700/30 px-2 py-1 rounded">
+              <Clock className="w-3 h-3 mr-1" />
+              {rec.duration}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="text-center ml-3">
+        <motion.div
+          className="bg-gradient-to-r from-yellow-500 to-orange-500 px-3 py-2 rounded-lg mb-1"
+          whileHover={{ scale: 1.1 }}
+          animate={{ scale: [1, 1.05, 1] }}
+          transition={{ duration: 2, repeat: Infinity }}
+        >
+          <Star className="w-4 h-4 text-white mx-auto mb-1" />
+          <span className="font-bold text-white text-sm">
+            {(rec.matching_score * 100).toFixed(0)}%
+          </span>
+        </motion.div>
+        <div className="text-xs text-green-400 font-medium">Match</div>
+      </div>
+    </div>
+
+    {rec.stipend && (
+      <div className="mb-3 p-2 bg-green-600/10 border border-green-600/20 rounded-lg">
+        <div className="flex items-center text-green-400 text-sm font-medium">
+          <span className="mr-1">💰</span>
+          {rec.stipend}
+        </div>
+      </div>
+    )}
+
+    <p className="text-gray-300 text-sm mb-4 leading-relaxed line-clamp-3">
+      {rec.justification}
+    </p>
+
+    <div className="space-y-3">
+      <SkillList title="Required Skills" skills={rec.requirements} color="emerald" maxVisible={3} />
+
+      {rec.preferred_skills?.length > 0 && (
+        <SkillList title="Preferred" skills={rec.preferred_skills} color="blue" maxVisible={2} />
+      )}
+    </div>
+
+    <div className="mt-4 pt-3 border-t border-gray-700/30 flex items-center justify-between">
+      {rec.application_deadline && (
+        <div className="text-xs text-orange-400 flex items-center">
+          <Calendar className="w-3 h-3 mr-1" />
+          Apply by: {rec.application_deadline}
+        </div>
+      )}
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded-md font-medium transition-colors ml-auto"
+      >
+        View Details
+      </motion.button>
+    </div>
+  </motion.div>
+);
+
+const SkillList = ({ title, skills, color, maxVisible }) => {
+  if (!skills?.length) return null;
+
+  const colorClasses = {
+    emerald: 'bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30',
+    blue: 'bg-blue-600/20 text-blue-300 hover:bg-blue-600/30'
+  };
+
+  return (
+    <div>
+      <span className="text-xs text-gray-500 font-medium mb-2 block">{title}:</span>
+      <div className="flex flex-wrap gap-1">
+        {skills.slice(0, maxVisible).map((skill, idx) => (
+          <motion.span
+            key={idx}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: idx * 0.1 }}
+            whileHover={{ scale: 1.05 }}
+            className={`px-2 py-1 ${colorClasses[color]} text-xs rounded cursor-pointer hover:${colorClasses[color]} transition-colors`}
+          >
+            {skill}
+          </motion.span>
+        ))}
+        {skills.length > maxVisible && (
+          <span className="px-2 py-1 bg-gray-600/20 text-gray-400 text-xs rounded">
+            +{skills.length - maxVisible}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const StatCard = ({ value, label, color }) => {
+  const colorClasses = {
+    purple: 'bg-purple-600/10 border-purple-500/20 text-purple-400',
+    green: 'bg-green-600/10 border-green-500/20 text-green-400',
+    blue: 'bg-blue-600/10 border-blue-500/20 text-blue-400',
+    yellow: 'bg-yellow-600/10 border-yellow-500/20 text-yellow-400'
+  };
+
+  return (
+    <motion.div
+      whileHover={{ scale: 1.02 }}
+      className={`${colorClasses[color]} rounded-lg p-4 text-center`}
+    >
+      <div className="text-3xl font-bold">
+        {value}
+      </div>
+      <div className="text-sm text-gray-400 mt-1">{label}</div>
+    </motion.div>
+  );
+};
+
+const PortfolioGaps = ({ analysisResults }) => {
+  if (!analysisResults?.portfolio_gaps?.length) {
+    return null;
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.3 }}
+      className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-lg p-6"
+    >
+      <h3 className="text-xl font-bold mb-4 flex items-center">
+        <AlertCircle className="w-5 h-5 mr-2 text-red-400" />
+        AI-Identified Portfolio Gaps
+      </h3>
+      <div className="space-y-3">
+        {analysisResults.portfolio_gaps.map((gap, index) => (
+          <PortfolioGapItem key={index} gap={gap} />
+        ))}
+      </div>
+    </motion.div>
+  );
+};
+
+const PortfolioGapItem = ({ gap }) => {
+  const priorityColor = {
+    high: 'bg-red-600/20 text-red-300',
+    medium: 'bg-yellow-600/20 text-yellow-300',
+    low: 'bg-green-600/20 text-green-300'
+  };
+
+  return (
+    <div className="bg-gray-800/30 rounded-lg p-4">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <h4 className="font-semibold">{gap.title || `${gap.gap_type} Gap`}</h4>
+            <span className={`px-2 py-1 text-xs rounded-lg ${priorityColor[gap.priority] || priorityColor.medium}`}>
+              {gap.priority} priority
+            </span>
+            {gap.estimated_time && (
+              <span className="px-2 py-1 bg-gray-600/20 text-gray-300 text-xs rounded">
+                {gap.estimated_time}
+              </span>
+            )}
+          </div>
+          <p className="text-gray-300 text-sm mb-3">{gap.description}</p>
+          <div className="flex items-center mb-2">
+            <CheckCircle className="w-4 h-4 text-green-400 mr-2" />
+            <p className="text-green-400 text-sm font-medium">{gap.suggested_action}</p>
+          </div>
+        </div>
+        {gap.resources?.length > 0 && (
+          <div>
+            <span className="text-xs text-gray-500">Recommended Resources:</span>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {gap.resources.map((resource, idx) => (
+                <span key={idx} className="px-2 py-1 bg-indigo-600/20 text-indigo-300 text-xs rounded">
+                  {resource}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const ExtractionDetails = ({ analysisResults }) => {
+  if (!analysisResults) return null;
+
+  const profile = analysisResults.student_profile || {};
+  const extraction = analysisResults.detailed_extraction || {};
+
+  return (
+    <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-lg p-6">
+      <h3 className="text-xl font-bold mb-4 flex items-center">
+        <FileText className="w-5 h-5 mr-2 text-green-400" />
+        Extraction Details
+      </h3>
+
+      {analysisResults.detailed_extraction && (
+        <div className="grid md:grid-cols-3 gap-4 mb-4">
+          <StatItem
+            title="Document Stats"
+            stats={[
+              { label: 'Words', value: extraction.total_words || 0 },
+              { label: 'Characters', value: extraction.total_characters || 0 },
+              { label: 'Paragraphs', value: extraction.paragraphs || 0 }
+            ]}
+          />
+
+          <StatItem
+            title="Contact Information"
+            stats={[
+              { label: 'Email', value: extraction.email_patterns_found || 0, icon: '📧', hasValue: extraction.email_patterns_found > 0 },
+              { label: 'Phone', value: extraction.phone_patterns_found || 0, icon: '📱', hasValue: extraction.phone_patterns_found > 0 },
+              { label: 'URLs', value: extraction.url_patterns_found || 0, icon: '🔗', hasValue: extraction.url_patterns_found > 0 }
+            ]}
+          />
+
+          <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50">
+            <p className="text-gray-400 text-xs">AI Processing</p>
+            <div className="text-sm space-y-1">
+              <div className="text-green-400">✓ Text Extracted</div>
+              <div className="text-green-400">✓ Patterns Detected</div>
+              <div className="text-green-400">✓ Structure Analyzed</div>
+            </div>
+          </div>
+
+          <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50">
+            <p className="text-gray-400 text-xs">Sections Found</p>
+            <div className="text-xs">
+              <span className="text-purple-400 font-mono">
+                {extraction.sections_detected?.length || 0} sections
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {extraction.sections_detected?.slice(0, 3).map((section, idx) => (
+                <span key={idx} className="px-1 py-0.5 bg-purple-600/20 text-purple-300 text-xs rounded">
+                  {section}
+                </span>
+              ))}
+              {(extraction.sections_detected?.length || 0) > 3 && (
+                <span className="text-xs text-gray-400">+{extraction.sections_detected?.length - 3 || 0}</span>
               )}
-            </motion.div>
+            </div>
+          </div>
+        </div>
+      )}
 
-            {analysisResults?.readiness_evaluations?.[0] && (
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.5 }}
-                className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-6"
-              >
-                <h3 className="text-lg font-semibold mb-4 flex items-center">
-                  <TrendingUp className="w-5 h-5 mr-2 text-green-400" />
-                  Next Steps
-                </h3>
-                <div className="space-y-3">
-                  {analysisResults.readiness_evaluations[0].next_steps?.map((step, index) => (
-                    <div key={index} className="p-3 bg-gray-800/30 rounded-lg">
-                      <p className="text-sm font-medium">{step}</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-                  <div className="flex items-center">
-                    <Clock className="w-4 h-4 text-blue-400 mr-2" />
-                    <p className="text-sm text-blue-300">
-                      Timeline: {analysisResults.readiness_evaluations[0].timeline}
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
+      <div className="grid md:grid-cols-2 gap-4">
+        <InfoItem label="Name" value={profile.name || 'Not detected'} />
+        <InfoItem label="Experience Level" value={profile.experience_level || 'Entry-level'} capitalize />
+
+        <div>
+          <p className="text-gray-400 text-sm">Contact Info</p>
+          <div className="text-sm space-y-1">
+            {profile.email && (
+              <div className="text-blue-300 flex items-center">
+                <Mail className="w-3 h-3 mr-1" />
+                {profile.email}
+              </div>
+            )}
+            {profile.phone && (
+              <div className="text-green-300 flex items-center">
+                <Phone className="w-3 h-3 mr-1" />
+                {profile.phone}
+              </div>
+            )}
+            {profile.education?.[0]?.institution && (
+              <div className="text-purple-300 flex items-center">
+                <Award className="w-3 h-3 mr-1" />
+                {profile.education[0].institution}
+              </div>
+            )}
+            {!profile.email && !profile.phone && (
+              <div className="text-gray-400">No contact information detected</div>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <p className="text-gray-400 text-sm">Skills ({profile.skills?.length || 0})</p>
+          <div className="flex flex-wrap gap-1 mt-1">
+            {profile.skills?.slice(0, 6).map((skill, idx) => (
+              <span key={idx} className="px-2 py-1 bg-blue-600/20 text-blue-300 text-xs rounded">
+                {skill}
+              </span>
+            ))}
+            {(profile.skills?.length || 0) > 6 && (
+              <span className="px-2 py-1 bg-gray-600/20 text-gray-300 text-xs rounded">
+                +{profile.skills.length - 6} more
+              </span>
             )}
           </div>
         </div>
       </div>
     </div>
+  );
+};
+
+const StatItem = ({ title, stats }) => (
+  <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50">
+    <p className="text-gray-400 text-xs mb-1">{title}</p>
+    {stats.map((stat, idx) => (
+      <div key={idx} className="text-sm space-y-1">
+        {stat.icon && <span>{stat.icon}</span>}
+        {stat.hasValue !== undefined ? (
+          <div className={stat.hasValue ? 'text-green-400' : 'text-red-400'}>
+            {stat.label}: {stat.value}
+          </div>
+        ) : (
+          <div className="flex justify-between">
+            <span>{stat.label}:</span>
+            <span className={`font-mono ${stat.color || ''}`}>{stat.value}</span>
+          </div>
+        )}
+      </div>
+    ))}
+  </div>
+);
+
+const InfoItem = ({ label, value, capitalize }) => (
+  <div>
+    <p className="text-gray-400 text-sm">{label}</p>
+    <p className={`font-semibold ${capitalize ? 'capitalize' : ''}`}>{value}</p>
+  </div>
+);
+
+const Sidebar = ({ analysisResults, recentActivity, showAgentComm, setShowAgentComm }) => {
+  return (
+    <div className="space-y-6">
+      <ProgressCard recentActivity={recentActivity} analysisResults={analysisResults} />
+
+      {analysisResults?.readiness_evaluations?.[0] && (
+        <NextStepsCard readinessEvaluation={analysisResults.readiness_evaluations[0]} />
+      )}
+
+      <AIInsightsCard analysisResults={analysisResults} />
+
+      <QuickActionsCard
+        analysisResults={analysisResults}
+        showAgentComm={showAgentComm}
+        setShowAgentComm={setShowAgentComm}
+      />
+    </div>
+  );
+};
+
+const ProgressCard = ({ recentActivity, analysisResults }) => {
+  const completedCount = recentActivity.filter(a => a.status === 'completed').length;
+  const totalCount = recentActivity.length;
+  const aiSteps = analysisResults?.agent_communications?.length || 0;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: 0.4 }}
+      className="group bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl overflow-hidden hover:border-blue-500/30 transition-all duration-300"
+    >
+      <div className="p-4 cursor-pointer">
+        <h3 className="text-lg font-semibold flex items-center justify-between">
+          <span className="flex items-center">
+            <Clock className="w-5 h-5 mr-2 text-blue-400" />
+            Progress
+          </span>
+          <motion.div
+            animate={{ rotate: 0 }}
+            className="group-hover:rotate-180 transition-transform duration-300"
+          >
+            <ChevronDown className="w-4 h-4 text-gray-400" />
+          </motion.div>
+        </h3>
+
+        <div className="mt-3 space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-400">Status:</span>
+            <span className="flex items-center text-green-400">
+              <CheckCircle className="w-3 h-3 mr-1" />
+              {completedCount}/{totalCount}
+            </span>
+          </div>
+          {analysisResults && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-400">AI Steps:</span>
+              <span className="text-blue-400 font-medium">
+                {aiSteps}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <AnimatePresence>
+        <motion.div
+          initial={{ height: 0, opacity: 0 }}
+          whileHover={{ height: 'auto', opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          className="overflow-hidden"
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+        >
+          <div className="px-4 pb-4 border-t border-gray-700/50">
+            <div className="space-y-3 mt-4">
+              {recentActivity.map((activity, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className="flex items-center space-x-3 p-2 bg-gray-800/30 rounded-lg"
+                >
+                  <div className={`${activity.status === 'completed' ? 'text-blue-400' : 'text-gray-400'}`}>
+                    {activity.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{activity.title}</p>
+                    <p className="text-xs text-gray-400">{activity.time}</p>
+                  </div>
+                  {activity.status === 'completed' && (
+                    <CheckCircle className="w-3 h-3 text-blue-400 flex-shrink-0" />
+                  )}
+                </motion.div>
+              ))}
+            </div>
+
+            {analysisResults?.detailed_extraction && (
+              <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                <h4 className="text-sm font-semibold text-blue-300 mb-2">Summary</h4>
+                <div className="text-xs text-blue-200 space-y-1">
+                  <div>✓ {analysisResults.detailed_extraction.total_words || 0} words</div>
+                  <div>✓ {analysisResults.extraction_info?.skills_count || 0} skills</div>
+                  <div>✓ {analysisResults.internship_recommendations?.length || 0} matches</div>
+                  <div>✓ {analysisResults.detailed_extraction.sections_detected?.length || 0} sections</div>
+                </div>
+
+                {analysisResults.agent_communications && (
+                  <div className="mt-2 pt-2 border-t border-blue-500/20">
+                    <div className="text-xs text-blue-200">
+                      Success Rate: {Math.round(
+                        (analysisResults.agent_communications.filter(c => c.status === 'success' || c.status === 'completed').length /
+                         analysisResults.agent_communications.length) * 100
+                      )}%
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
+const NextStepsCard = ({ readinessEvaluation }) => {
+  const steps = readinessEvaluation.next_steps || [];
+  const timeline = readinessEvaluation.timeline;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: 0.5 }}
+      className="group bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl overflow-hidden hover:border-green-500/30 transition-all duration-300"
+    >
+      <div className="p-4 cursor-pointer">
+        <h3 className="text-lg font-semibold flex items-center justify-between">
+          <span className="flex items-center">
+            <TrendingUp className="w-5 h-5 mr-2 text-green-400" />
+            Next Steps
+          </span>
+          <motion.div
+            animate={{ rotate: 0 }}
+            className="group-hover:rotate-180 transition-transform duration-300"
+          >
+            <ChevronDown className="w-4 h-4 text-gray-400" />
+          </motion.div>
+        </h3>
+
+        <div className="mt-3">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-400">Action Items:</span>
+            <span className="flex items-center text-green-400 font-medium">
+              <Target className="w-3 h-3 mr-1" />
+              {steps.length}
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-sm mt-1">
+            <span className="text-gray-400">Timeline:</span>
+            <span className="text-green-400 text-xs">
+              {timeline}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        <motion.div
+          initial={{ height: 0, opacity: 0 }}
+          whileHover={{ height: 'auto', opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          className="overflow-hidden"
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+        >
+          <div className="px-4 pb-4 border-t border-gray-700/50">
+            <div className="space-y-3 mt-4">
+              {steps.map((step, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className="p-3 bg-gray-800/30 rounded-lg border-l-2 border-green-500/50"
+                >
+                  <p className="text-sm font-medium flex items-start">
+                    <span className="text-green-400 mr-2 mt-0.5 text-xs">•</span>
+                    <span className="leading-relaxed">{step}</span>
+                  </p>
+                </motion.div>
+              ))}
+            </div>
+
+            <div className="mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-lg">
+              <div className="flex items-start">
+                <Clock className="w-4 h-4 text-green-400 mr-2 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm text-green-300 font-medium">
+                    {timeline}
+                  </p>
+                  <p className="text-xs text-green-200 mt-1 leading-relaxed">
+                    Follow these steps to improve your internship readiness score
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
+const AIInsightsCard = ({ analysisResults }) => {
+  if (!analysisResults) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.6 }}
+        className="bg-gradient-to-br from-purple-900/30 to-blue-900/30 backdrop-blur-sm border border-purple-500/30 rounded-xl p-5 text-center"
+      >
+        <motion.div
+          animate={{
+            scale: [1, 1.1, 1],
+            opacity: [0.5, 1, 0.5]
+          }}
+          transition={{ duration: 2, repeat: Infinity }}
+        >
+          <Brain className="w-12 h-12 mx-auto text-purple-400 mb-3" />
+        </motion.div>
+        <p className="text-gray-400 text-sm leading-relaxed">
+          Upload your resume to see AI-powered insights
+        </p>
+      </motion.div>
+    );
+  }
+
+  const skills = analysisResults.student_profile?.skills || [];
+  const recommendations = analysisResults.internship_recommendations || [];
+  const averageMatch = Math.round(
+    (recommendations.reduce((acc, rec) => acc + rec.matching_score, 0) / (recommendations.length || 1)) * 100
+  );
+  const gaps = analysisResults.portfolio_gaps || [];
+  const focusArea = gaps.length > 0 ? gaps[0].title || 'Portfolio Enhancement' : 'Ready to apply!';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: 0.6 }}
+      className="bg-gradient-to-br from-purple-900/30 to-blue-900/30 backdrop-blur-sm border border-purple-500/30 rounded-xl p-5"
+    >
+      <h3 className="text-lg font-semibold mb-4 flex items-center">
+        <Brain className="w-5 h-5 mr-2 text-purple-400" />
+        AI Insights
+      </h3>
+
+      <div className="space-y-4">
+        <div className="bg-purple-800/20 rounded-lg p-3 border border-purple-500/20">
+          <h4 className="text-sm font-medium text-purple-300 mb-2">Top Skills</h4>
+          <div className="flex flex-wrap gap-1">
+            {skills.slice(0, 3).map((skill, idx) => (
+              <span key={idx} className="px-2 py-1 bg-purple-600/20 text-purple-200 text-xs rounded">
+                {skill}
+              </span>
+            ))}
+            {skills.length > 3 && (
+              <span className="px-2 py-1 bg-purple-600/30 text-purple-200 text-xs rounded">
+                +{skills.length - 3}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-blue-800/20 rounded-lg p-3 border border-blue-500/20">
+          <h4 className="text-sm font-medium text-blue-300 mb-2">Match Quality</h4>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-blue-200">Average:</span>
+            <span className="text-xl font-bold text-blue-400">
+              {averageMatch}%
+            </span>
+          </div>
+        </div>
+
+        <div className="bg-orange-800/20 rounded-lg p-3 border border-orange-500/20">
+          <h4 className="text-sm font-medium text-orange-300 mb-2">Focus Area</h4>
+          <div className="text-sm text-orange-200">
+            {focusArea}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+const QuickActionsCard = ({ analysisResults, showAgentComm, setShowAgentComm }) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: 0.7 }}
+      className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-5"
+    >
+      <h3 className="text-lg font-semibold mb-4 flex items-center">
+        <Zap className="w-5 h-5 mr-2 text-yellow-400" />
+        Actions
+      </h3>
+
+      <div className="space-y-3">
+        <motion.button
+          whileHover={{ scale: 1.02, x: 3 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => document.getElementById('resume-upload')?.click()}
+          className="w-full flex items-center justify-between p-3 bg-gradient-to-r from-blue-600/20 to-purple-600/20 hover:from-blue-600/30 hover:to-purple-600/30 rounded-lg border border-blue-500/20 transition-all"
+        >
+          <div className="flex items-center">
+            <Upload className="w-4 h-4 mr-3 text-blue-400" />
+            <span className="text-sm font-medium">Upload Resume</span>
+          </div>
+          <ChevronDown className="w-4 h-4 text-gray-400 rotate-[-90deg]" />
+        </motion.button>
+
+        {analysisResults && (
+          <>
+            <motion.button
+              whileHover={{ scale: 1.02, x: 3 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                const data = {
+                  profile: analysisResults.student_profile,
+                  recommendations: analysisResults.internship_recommendations,
+                  gaps: analysisResults.portfolio_gaps,
+                  timestamp: new Date().toISOString()
+                };
+
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `internai-analysis-${Date.now()}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                toast.success('Analysis downloaded successfully!');
+              }}
+              className="w-full flex items-center justify-between p-3 bg-gradient-to-r from-green-600/20 to-teal-600/20 hover:from-green-600/30 hover:to-teal-600/30 rounded-lg border border-green-500/20 transition-all"
+            >
+              <div className="flex items-center">
+                <Download className="w-4 h-4 mr-3 text-green-400" />
+                <span className="text-sm font-medium">Download Report</span>
+              </div>
+              <ChevronDown className="w-4 h-4 text-gray-400 rotate-[-90deg]" />
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.02, x: 3 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                setAnalysisResults(null);
+                document.getElementById('resume-upload').value = '';
+              }}
+              className="w-full flex items-center justify-between p-3 bg-gradient-to-r from-orange-600/20 to-red-600/20 hover:from-orange-600/30 hover:to-red-600/30 rounded-lg border border-orange-500/20 transition-all"
+            >
+              <div className="flex items-center">
+                <RefreshCw className="w-4 h-4 mr-3 text-orange-400" />
+                <span className="text-sm font-medium">New Analysis</span>
+              </div>
+              <ChevronDown className="w-4 h-4 text-gray-400 rotate-[-90deg]" />
+            </motion.button>
+          </>
+        )}
+      </div>
+    </motion.div>
   );
 };
 
