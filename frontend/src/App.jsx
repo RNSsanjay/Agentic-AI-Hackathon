@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import Signup from './pages/signup';
 import Home from './pages/home';
 import Landing from './pages/landing';
+import AnalysisHistory from './pages/AnalysisHistory';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Component to handle routing based on auth state
@@ -40,6 +41,14 @@ const AppRoutes = () => {
                 element={
                     <ProtectedRoute>
                         <Home />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/analysis-history"
+                element={
+                    <ProtectedRoute>
+                        <AnalysisHistory />
                     </ProtectedRoute>
                 }
             />

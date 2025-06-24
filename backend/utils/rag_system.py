@@ -62,13 +62,47 @@ class InternshipRAG:
     
     def _create_profile_text(self, profile: Dict, preferences: List[str]) -> str:
         """Create searchable text from student profile"""
+        # Helper function to extract text from projects/certifications
+        def extract_text_from_items(items):
+            if not items:
+                return []
+            text_items = []
+            for item in items:
+                if isinstance(item, dict):
+                    # Extract relevant text fields from dict
+                    text_parts = []
+                    if 'name' in item:
+                        text_parts.append(str(item['name']))
+                    if 'title' in item:
+                        text_parts.append(str(item['title']))
+                    if 'description' in item:
+                        text_parts.append(str(item['description']))
+                    if 'technologies' in item:
+                        if isinstance(item['technologies'], list):
+                            text_parts.extend([str(tech) for tech in item['technologies']])
+                        else:
+                            text_parts.append(str(item['technologies']))
+                    if 'skills' in item:
+                        if isinstance(item['skills'], list):
+                            text_parts.extend([str(skill) for skill in item['skills']])
+                        else:
+                            text_parts.append(str(item['skills']))
+                    text_items.append(' '.join(text_parts))
+                else:
+                    text_items.append(str(item))
+            return text_items
+        
+        # Extract text from projects and certifications
+        projects_text = extract_text_from_items(profile.get('projects', []))
+        certifications_text = extract_text_from_items(profile.get('certifications', []))
+        
         text_parts = [
             ' '.join(profile.get('skills', [])),
             ' '.join(profile.get('domains', [])),
             ' '.join(preferences),
             profile.get('experience_level', ''),
-            ' '.join(profile.get('projects', [])),
-            ' '.join(profile.get('certifications', []))
+            ' '.join(projects_text),
+            ' '.join(certifications_text)
         ]
         return ' '.join(filter(None, text_parts))
     

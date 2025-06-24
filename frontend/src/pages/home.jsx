@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -85,10 +86,12 @@ const pulseVariants = {
 const Home = () => {
   // State management
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [analysisResults, setAnalysisResults] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [uploadedResume, setUploadedResume] = useState(null);
   const [selectedPreferences, setSelectedPreferences] = useState(['Web Development', 'Data Science']);
+  const [githubLink, setGithubLink] = useState('');
   const [error, setError] = useState('');
   const [analysisStep, setAnalysisStep] = useState('');
   const [progress, setProgress] = useState(0);
@@ -96,11 +99,119 @@ const Home = () => {
   const [expandedAgent, setExpandedAgent] = useState(null);
   const [showFullText, setShowFullText] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
+  const [internships, setInternships] = useState([]);
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Derived state
-  const recentActivity = analysisResults ? [
+  // Fetch data on component mount
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+
+      // Fetch internships
+      const internshipsResponse = await axios.get('http://127.0.0.1:8000/api/internships/');
+      if (internshipsResponse.data.status === 'success') {
+        setInternships(internshipsResponse.data.internships);
+      }
+
+      // Fetch dashboard stats
+      const statsResponse = await axios.get('http://127.0.0.1:8000/api/dashboard/stats/');
+      if (statsResponse.data.status === 'success') {
+        setDashboardStats(statsResponse.data.stats);
+      }
+
+      // Fetch recent activity
+      const activityResponse = await axios.get('http://127.0.0.1:8000/api/activity/');
+      if (activityResponse.data.status === 'success') {
+        setRecentActivity(activityResponse.data.activity);
+      }
+
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      toast.error('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Generate dashboard stats from real data - Start with zeros, update with actual data
+  const dashboardStatsData = dashboardStats && dashboardStats.using_real_data ? [
     {
-      title: 'Resume analyzed',
+      label: 'Readiness Score',
+      value: `${dashboardStats.readiness_score || 0}%`,
+      change: 'Your internship readiness',
+      icon: <Star className="w-5 h-5" />,
+      color: 'text-yellow-400',
+      bgColor: 'from-yellow-600/20 to-yellow-400/20'
+    },
+    {
+      label: 'Internship Matches',
+      value: dashboardStats.internship_match_count || 0,
+      change: 'Opportunities found',
+      icon: <Target className="w-5 h-5" />,
+      color: 'text-green-400',
+      bgColor: 'from-green-600/20 to-green-400/20'
+    },
+    {
+      label: 'Gaps Detected',
+      value: dashboardStats.gaps_detected || 0,
+      change: 'Areas to improve',
+      icon: <AlertCircle className="w-5 h-5" />,
+      color: 'text-red-400',
+      bgColor: 'from-red-600/20 to-red-400/20'
+    },
+    {
+      label: 'Available Internships',
+      value: dashboardStats.total_available_internships || 0,
+      change: 'Total opportunities',
+      icon: <Briefcase className="w-5 h-5" />,
+      color: 'text-blue-400',
+      bgColor: 'from-blue-600/20 to-blue-400/20'
+    }
+  ] : [
+    {
+      label: 'Readiness Score',
+      value: '0%',
+      change: 'Upload resume to analyze',
+      icon: <Star className="w-5 h-5" />,
+      color: 'text-gray-400',
+      bgColor: 'from-gray-600/20 to-gray-400/20'
+    },
+    {
+      label: 'Internship Matches',
+      value: '0',
+      change: 'Upload resume to find matches',
+      icon: <Target className="w-5 h-5" />,
+      color: 'text-gray-400',
+      bgColor: 'from-gray-600/20 to-gray-400/20'
+    },
+    {
+      label: 'Gaps Detected',
+      value: '0',
+      change: 'Upload resume to detect gaps',
+      icon: <AlertCircle className="w-5 h-5" />,
+      color: 'text-gray-400',
+      bgColor: 'from-gray-600/20 to-gray-400/20'
+    },
+    {
+      label: 'Available Internships',
+      value: loading ? '...' : '50+',
+      change: 'Ready for matching',
+      icon: loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Briefcase className="w-5 h-5" />,
+      color: 'text-blue-400',
+      bgColor: 'from-blue-600/20 to-blue-400/20'
+    }
+  ];
+
+  // Derived state for activity
+  const activityData = analysisResults ? [
+    {
+      title: 'Resume analyzed with GitHub integration',
       time: new Date(analysisResults.processing_timestamp).toLocaleString(),
       icon: <FileText className="w-4 h-4" />,
       status: 'completed'
@@ -116,10 +227,21 @@ const Home = () => {
       time: new Date(analysisResults.processing_timestamp).toLocaleString(),
       icon: <AlertCircle className="w-4 h-4" />,
       status: 'completed'
-    }
-  ] : [
-    { title: 'Waiting for resume upload', time: 'Pending', icon: <Upload className="w-4 h-4" />, status: 'pending' }
-  ];
+    },
+    ...(analysisResults.student_profile?.github_analysis ? [{
+      title: `GitHub analyzed: ${analysisResults.student_profile.github_analysis.public_repos} repos found`,
+      time: new Date(analysisResults.processing_timestamp).toLocaleString(),
+      icon: <Github className="w-4 h-4" />,
+      status: 'completed'
+    }] : [])
+  ] : recentActivity.map(activity => ({
+    ...activity,
+    icon: activity.type === 'new_opportunity' ? <Sparkles className="w-4 h-4" /> :
+      activity.type === 'deadline' ? <Clock className="w-4 h-4" /> :
+        activity.type === 'match' ? <Target className="w-4 h-4" /> :
+          <CheckCircle className="w-4 h-4" />,
+    status: 'pending'
+  }));
 
   const stats = analysisResults ? [
     {
@@ -213,15 +335,18 @@ const Home = () => {
     const formData = new FormData();
     formData.append('resume', file);
     formData.append('preferences', JSON.stringify(selectedPreferences));
+    if (githubLink.trim()) {
+      formData.append('github_link', githubLink.trim());
+    }
 
     const steps = [
-      'Uploading resume...',
-      'Extracting text content...',
-      'Analyzing student profile...',
-      'Matching internships...',
-      'Identifying portfolio gaps...',
-      'Evaluating readiness...',
-      'Finalizing recommendations...'
+      'Uploading resume and GitHub profile...',
+      'Student Profile Analyzer → Extracting skills and domains...',
+      'Internship Matcher → Finding best-fit internships...',
+      'Portfolio Gap Detector → Flagging missing skills...',
+      'RAG-Powered Requirement Aligner → Retrieving real expectations...',
+      'Readiness Evaluator → Calculating readiness scores...',
+      'Generating personalized preparation plan...'
     ];
 
     let stepIndex = 0;
@@ -251,7 +376,7 @@ const Home = () => {
       );
 
       clearInterval(stepInterval);
-      processAnalysisResults(response.data);
+      await processAnalysisResults(response.data);
     } catch (err) {
       clearInterval(stepInterval);
       handleAnalysisError(err);
@@ -261,7 +386,7 @@ const Home = () => {
     }
   };
 
-  const processAnalysisResults = (data) => {
+  const processAnalysisResults = async (data) => {
     if (data.error) {
       throw new Error(data.error);
     }
@@ -270,6 +395,20 @@ const Home = () => {
     setProgress(100);
     setAnalysisResults(data);
     toast.success('Resume analyzed successfully!');
+
+    // The dashboard cache is already updated by the backend after saving to MongoDB
+    // Just refresh the dashboard stats to show updated data
+    setTimeout(async () => {
+      try {
+        const statsResponse = await axios.get('http://127.0.0.1:8000/api/dashboard/stats/');
+        if (statsResponse.data.status === 'success') {
+          setDashboardStats(statsResponse.data.stats);
+          toast.success('Dashboard updated with your analysis results!');
+        }
+      } catch (err) {
+        console.warn('Failed to refresh dashboard stats:', err);
+      }
+    }, 1000);
 
     if (data.detailed_extraction) {
       const extraction = data.detailed_extraction;
@@ -396,67 +535,102 @@ const Home = () => {
   return (
     <div className="min-h-screen bg-black text-white">
       <Navbar />
-      <motion.div
-        className="max-w-7xl mx-auto px-6 py-8"
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        <WelcomeSection user={user} />
-
-        <StatsSection stats={stats} />
-
-        <div className="grid lg:grid-cols-4 gap-8">
-          <MainContent
-            analysisResults={analysisResults}
-            isAnalyzing={isAnalyzing}
-            uploadedResume={uploadedResume}
-            selectedPreferences={selectedPreferences}
-            error={error}
-            analysisStep={analysisStep}
-            progress={progress}
-            showAgentComm={showAgentComm}
-            expandedAgent={expandedAgent}
-            showFullText={showFullText}
-            copiedText={copiedText}
-            availableDomains={AVAILABLE_DOMAINS}
-            quickActions={QUICK_ACTIONS}
-            recentActivity={recentActivity}
-            handlePreferenceToggle={handlePreferenceToggle}
-            handleFileUpload={handleFileUpload}
-            retryAnalysis={retryAnalysis}
-            resetAnalysis={resetAnalysis}
-            setShowAgentComm={setShowAgentComm}
-            setExpandedAgent={setExpandedAgent}
-            setShowFullText={setShowFullText}
-            copyToClipboard={copyToClipboard}
-            downloadAnalysis={downloadAnalysis}
-            getStatusIcon={getStatusIcon}
-            getStatusColor={getStatusColor}
-            groupCommunicationsByAgent={groupCommunicationsByAgent}
-          />
-
-          <Sidebar
-            analysisResults={analysisResults}
-            recentActivity={recentActivity}
-            showAgentComm={showAgentComm}
-            setShowAgentComm={setShowAgentComm}
-            setAnalysisResults={setAnalysisResults}
-          />
+      {loading ? (
+        <div className="flex items-center justify-center min-h-screen">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center"
+          >
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+              className="w-16 h-16 border-4 border-blue-500/20 border-t-blue-500 rounded-full mx-auto mb-4"
+            />
+            <h2 className="text-xl font-semibold text-blue-400 mb-2">Loading InternAI Dashboard</h2>
+            <p className="text-gray-400">Fetching real-time internship data and GitHub integration...</p>
+          </motion.div>
         </div>
-      </motion.div>
+      ) : (
+        <motion.div
+          className="max-w-7xl mx-auto px-6 py-8"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          <WelcomeSection user={user} navigate={navigate} />
+
+          <StatsSection stats={dashboardStatsData} />
+
+          <div className="grid lg:grid-cols-4 gap-8">
+            <MainContent
+              analysisResults={analysisResults}
+              isAnalyzing={isAnalyzing}
+              uploadedResume={uploadedResume}
+              selectedPreferences={selectedPreferences}
+              githubLink={githubLink}
+              setGithubLink={setGithubLink}
+              error={error}
+              analysisStep={analysisStep}
+              progress={progress}
+              showAgentComm={showAgentComm}
+              expandedAgent={expandedAgent}
+              showFullText={showFullText}
+              copiedText={copiedText}
+              availableDomains={AVAILABLE_DOMAINS}
+              quickActions={QUICK_ACTIONS}
+              recentActivity={activityData}
+              handlePreferenceToggle={handlePreferenceToggle}
+              handleFileUpload={handleFileUpload}
+              retryAnalysis={retryAnalysis}
+              resetAnalysis={resetAnalysis}
+              setShowAgentComm={setShowAgentComm}
+              setExpandedAgent={setExpandedAgent}
+              setShowFullText={setShowFullText}
+              copyToClipboard={copyToClipboard}
+              downloadAnalysis={downloadAnalysis}
+              getStatusIcon={getStatusIcon}
+              getStatusColor={getStatusColor}
+              groupCommunicationsByAgent={groupCommunicationsByAgent}
+            />
+
+            <Sidebar
+              analysisResults={analysisResults}
+              recentActivity={activityData}
+              showAgentComm={showAgentComm}
+              setShowAgentComm={setShowAgentComm}
+              setAnalysisResults={setAnalysisResults}
+            />
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 };
 
-const WelcomeSection = ({ user }) => (
+const WelcomeSection = ({ user, navigate }) => (
   <motion.div variants={itemVariants} className="mb-8">
-    <h2 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
-      Welcome to InternAI, {user?.first_name || 'Student'}! 🤖
-    </h2>
-    <p className="text-blue-400 text-lg">
-      AI-powered resume analysis for intelligent internship matching.
-    </p>
+    <div className="flex items-center justify-between">
+      <div>
+        <h2 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+          Welcome to InternAI, {user?.first_name || 'Student'}! 🤖
+        </h2>
+        <p className="text-blue-400 text-lg">
+          AI-powered resume analysis for intelligent internship matching.
+        </p>
+      </div>
+      <div className="flex space-x-3">
+        <motion.button
+          onClick={() => navigate('/analysis-history')}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          className="flex items-center px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-purple-500/25"
+        >
+          <Clock className="w-4 h-4 mr-2" />
+          View History
+        </motion.button>
+      </div>
+    </div>
   </motion.div>
 );
 
@@ -495,6 +669,8 @@ const MainContent = ({
   isAnalyzing,
   uploadedResume,
   selectedPreferences,
+  githubLink,
+  setGithubLink,
   error,
   analysisStep,
   progress,
@@ -524,6 +700,8 @@ const MainContent = ({
         <UploadSection
           isAnalyzing={isAnalyzing}
           selectedPreferences={selectedPreferences}
+          githubLink={githubLink}
+          setGithubLink={setGithubLink}
           error={error}
           analysisStep={analysisStep}
           progress={progress}
@@ -559,6 +737,8 @@ const MainContent = ({
 const UploadSection = ({
   isAnalyzing,
   selectedPreferences,
+  githubLink,
+  setGithubLink,
   error,
   analysisStep,
   progress,
@@ -590,6 +770,30 @@ const UploadSection = ({
             availableDomains={availableDomains}
             handlePreferenceToggle={handlePreferenceToggle}
           />
+
+          {/* GitHub Profile Input */}
+          <div className="space-y-2">
+            <label htmlFor="github-input" className="block text-sm font-medium text-gray-300">
+              GitHub Profile (Optional)
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Github className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                id="github-input"
+                type="url"
+                value={githubLink}
+                onChange={(e) => setGithubLink(e.target.value)}
+                placeholder="https://github.com/username"
+                disabled={isAnalyzing}
+                className="block w-full pl-10 pr-3 py-3 border border-gray-700 rounded-lg bg-gray-800/50 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+            </div>
+            <p className="text-xs text-gray-500">
+              Add your GitHub profile to enhance portfolio analysis and get better recommendations
+            </p>
+          </div>
 
           <motion.label
             whileHover={{ scale: 1.02 }}
@@ -646,8 +850,8 @@ const DomainPreferences = ({ selectedPreferences, availableDomains, handlePrefer
           key={domain}
           onClick={() => handlePreferenceToggle(domain)}
           className={`p-2 text-xs rounded-lg transition-all ${selectedPreferences.includes(domain)
-              ? 'bg-blue-600 text-white border-blue-500'
-              : 'bg-gray-700/50 text-gray-300 border-gray-600 hover:bg-gray-600/50'
+            ? 'bg-blue-600 text-white border-blue-500'
+            : 'bg-gray-700/50 text-gray-300 border-gray-600 hover:bg-gray-600/50'
             } border`}
         >
           {domain}
@@ -769,6 +973,8 @@ const ResultsSection = ({
       <PortfolioGaps analysisResults={analysisResults} />
 
       <ExtractionDetails analysisResults={analysisResults} />
+
+      <GitHubAnalysis profile={analysisResults.student_profile} />
     </>
   );
 };
@@ -904,12 +1110,12 @@ const AgentCommunicationItem = ({
               <div
                 key={idx}
                 className={`w-2 h-2 rounded-full ${comm.status === 'success' || comm.status === 'completed'
-                    ? 'bg-green-400'
-                    : comm.status === 'failed'
-                      ? 'bg-red-400'
-                      : comm.status === 'processing' || comm.status === 'started'
-                        ? 'bg-blue-400'
-                        : 'bg-yellow-400'
+                  ? 'bg-green-400'
+                  : comm.status === 'failed'
+                    ? 'bg-red-400'
+                    : comm.status === 'processing' || comm.status === 'started'
+                      ? 'bg-blue-400'
+                      : 'bg-yellow-400'
                   }`}
               />
             ))}
@@ -1208,6 +1414,7 @@ const ProfileSummary = ({ analysisResults }) => {
           <PersonalInformation profile={profile} />
           <ContactInformation profile={profile} />
           {hasOnlineProfiles(profile) && <OnlineProfiles profile={profile} />}
+          {profile.github_analysis && <GitHubAnalysis profile={profile} />}
         </div>
 
         <div className="space-y-4">
@@ -2099,87 +2306,235 @@ const ProgressCard = ({ recentActivity, analysisResults }) => {
 const NextStepsCard = ({ readinessEvaluation }) => {
   const steps = readinessEvaluation.next_steps || [];
   const timeline = readinessEvaluation.timeline;
+  const [expandedStep, setExpandedStep] = useState(null);
+
+  // Handle both old format (array of strings) and new format (array of objects)
+  const processedSteps = Array.isArray(steps) ? steps.map((step, index) => {
+    if (typeof step === 'string') {
+      // Convert old format to new format
+      return {
+        category: 'General',
+        priority: 'Medium',
+        action: step,
+        description: 'Follow this recommendation to improve your readiness',
+        goal: 'Enhance your skills and qualifications',
+        timeline: '2-4 weeks',
+        resources: ['Online tutorials', 'Practice exercises'],
+        success_metrics: ['Complete the action item']
+      };
+    }
+    return step;
+  }) : [];
+
+  const getPriorityColor = (priority) => {
+    switch (priority?.toLowerCase()) {
+      case 'high': return 'text-red-400 bg-red-500/20 border-red-500/30';
+      case 'medium': return 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30';
+      case 'low': return 'text-green-400 bg-green-500/20 border-green-500/30';
+      default: return 'text-blue-400 bg-blue-500/20 border-blue-500/30';
+    }
+  };
 
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: 0.5 }}
-      className="group bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl overflow-hidden hover:border-green-500/30 transition-all duration-300"
+      className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl overflow-hidden hover:border-green-500/30 transition-all duration-300"
     >
-      <div className="p-4 cursor-pointer">
-        <h3 className="text-lg font-semibold flex items-center justify-between">
+      <div className="p-4">
+        <h3 className="text-lg font-semibold flex items-center justify-between mb-4">
           <span className="flex items-center">
             <TrendingUp className="w-5 h-5 mr-2 text-green-400" />
-            Next Steps
+            Personalized Action Plan
           </span>
-          <motion.div
-            animate={{ rotate: 0 }}
-            className="group-hover:rotate-180 transition-transform duration-300"
-          >
-            <ChevronDown className="w-4 h-4 text-gray-400" />
-          </motion.div>
+          <span className="text-sm text-gray-400">
+            {processedSteps.length} action items
+          </span>
         </h3>
 
-        <div className="mt-3">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-400">Action Items:</span>
-            <span className="flex items-center text-green-400 font-medium">
-              <Target className="w-3 h-3 mr-1" />
-              {steps.length}
-            </span>
-          </div>
-          <div className="flex items-center justify-between text-sm mt-1">
-            <span className="text-gray-400">Timeline:</span>
-            <span className="text-green-400 text-xs">
-              {timeline}
-            </span>
+        <div className="space-y-3">
+          {processedSteps.map((step, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              className="border border-gray-700/50 rounded-lg overflow-hidden hover:border-gray-600/50 transition-all duration-200"
+            >
+              {/* Step Header */}
+              <div
+                className="p-3 cursor-pointer hover:bg-gray-800/30 transition-colors"
+                onClick={() => setExpandedStep(expandedStep === index ? null : index)}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`px-2 py-1 rounded text-xs font-medium border ${getPriorityColor(step.priority)}`}>
+                        {step.priority} Priority
+                      </span>
+                      <span className="text-xs text-gray-400 bg-gray-800/50 px-2 py-1 rounded">
+                        {step.category}
+                      </span>
+                    </div>
+                    <h4 className="font-medium text-white flex items-center">
+                      <Target className="w-4 h-4 mr-2 text-green-400" />
+                      {step.action}
+                    </h4>
+                    <p className="text-sm text-gray-400 mt-1">{step.description}</p>
+                  </div>
+                  <motion.div
+                    animate={{ rotate: expandedStep === index ? 180 : 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                  </motion.div>
+                </div>
+              </div>
+
+              {/* Expanded Content */}
+              <AnimatePresence>
+                {expandedStep === index && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                    className="overflow-hidden border-t border-gray-700/50"
+                  >
+                    <div className="p-4 bg-gray-800/20 space-y-4">
+                      {/* Goal Section */}
+                      <div>
+                        <h5 className="flex items-center text-sm font-medium text-green-400 mb-2">
+                          <Award className="w-4 h-4 mr-1" />
+                          Goal to Achieve
+                        </h5>
+                        <p className="text-sm text-gray-300 bg-green-900/20 p-3 rounded border-l-2 border-green-500/50">
+                          {step.goal}
+                        </p>
+                      </div>
+
+                      {/* Timeline */}
+                      <div>
+                        <h5 className="flex items-center text-sm font-medium text-blue-400 mb-2">
+                          <Clock className="w-4 h-4 mr-1" />
+                          Timeline
+                        </h5>
+                        <span className="text-sm text-blue-300 bg-blue-900/20 px-3 py-1 rounded">
+                          {step.timeline}
+                        </span>
+                      </div>
+
+                      {/* Resources */}
+                      {step.resources && step.resources.length > 0 && (
+                        <div>
+                          <h5 className="flex items-center text-sm font-medium text-purple-400 mb-2">
+                            <BookmarkPlus className="w-4 h-4 mr-1" />
+                            Learning Resources
+                          </h5>
+                          <div className="space-y-1">
+                            {step.resources.map((resource, resIndex) => (
+                              <div key={resIndex} className="flex items-start text-sm text-gray-300">
+                                <span className="text-purple-400 mr-2 mt-1">•</span>
+                                {resource}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Success Metrics */}
+                      {step.success_metrics && step.success_metrics.length > 0 && (
+                        <div>
+                          <h5 className="flex items-center text-sm font-medium text-orange-400 mb-2">
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                            Success Metrics
+                          </h5>
+                          <div className="space-y-1">
+                            {step.success_metrics.map((metric, metricIndex) => (
+                              <div key={metricIndex} className="flex items-start text-sm text-gray-300">
+                                <CheckCircle className="w-3 h-3 text-orange-400 mr-2 mt-1 flex-shrink-0" />
+                                {metric}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Special sections for specific step types */}
+                      {step.project_ideas && (
+                        <div>
+                          <h5 className="flex items-center text-sm font-medium text-cyan-400 mb-2">
+                            <Code className="w-4 h-4 mr-1" />
+                            Project Ideas
+                          </h5>
+                          <div className="space-y-1">
+                            {step.project_ideas.map((idea, ideaIndex) => (
+                              <div key={ideaIndex} className="flex items-start text-sm text-gray-300">
+                                <span className="text-cyan-400 mr-2 mt-1">→</span>
+                                {idea}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {step.github_checklist && (
+                        <div>
+                          <h5 className="flex items-center text-sm font-medium text-gray-400 mb-2">
+                            <Github className="w-4 h-4 mr-1" />
+                            GitHub Checklist
+                          </h5>
+                          <div className="space-y-1">
+                            {step.github_checklist.map((item, itemIndex) => (
+                              <div key={itemIndex} className="flex items-start text-sm text-gray-300">
+                                <span className="text-gray-400 mr-2 mt-1">☐</span>
+                                {item}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {step.learning_resources && (
+                        <div>
+                          <h5 className="flex items-center text-sm font-medium text-indigo-400 mb-2">
+                            <Globe className="w-4 h-4 mr-1" />
+                            Recommended Learning
+                          </h5>
+                          <div className="space-y-1">
+                            {step.learning_resources.map((resource, resIndex) => (
+                              <div key={resIndex} className="flex items-start text-sm text-gray-300">
+                                <span className="text-indigo-400 mr-2 mt-1">📚</span>
+                                {resource}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Overall Timeline */}
+        <div className="mt-4 p-3 bg-gradient-to-r from-green-900/20 to-blue-900/20 border border-green-500/30 rounded-lg">
+          <div className="flex items-start">
+            <Clock className="w-4 h-4 text-green-400 mr-2 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm text-green-300 font-medium">
+                Overall Timeline: {timeline}
+              </p>
+              <p className="text-xs text-green-200 mt-1 leading-relaxed">
+                Follow this personalized action plan to systematically improve your internship readiness and achieve your career goals.
+              </p>
+            </div>
           </div>
         </div>
       </div>
-
-      <AnimatePresence>
-        <motion.div
-          initial={{ height: 0, opacity: 0 }}
-          whileHover={{ height: 'auto', opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
-          className="overflow-hidden"
-          transition={{ duration: 0.3, ease: "easeInOut" }}
-        >
-          <div className="px-4 pb-4 border-t border-gray-700/50">
-            <div className="space-y-3 mt-4">
-              {steps.map((step, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="p-3 bg-gray-800/30 rounded-lg border-l-2 border-green-500/50"
-                >
-                  <p className="text-sm font-medium flex items-start">
-                    <span className="text-green-400 mr-2 mt-0.5 text-xs">•</span>
-                    <span className="leading-relaxed">{step}</span>
-                  </p>
-                </motion.div>
-              ))}
-            </div>
-
-            <div className="mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-lg">
-              <div className="flex items-start">
-                <Clock className="w-4 h-4 text-green-400 mr-2 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm text-green-300 font-medium">
-                    {timeline}
-                  </p>
-                  <p className="text-xs text-green-200 mt-1 leading-relaxed">
-                    Follow these steps to improve your internship readiness score
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      </AnimatePresence>
     </motion.div>
   );
 };
@@ -2344,6 +2699,83 @@ const QuickActionsCard = ({ analysisResults, showAgentComm, setShowAgentComm, se
             </motion.button>
           </>
         )}
+      </div>
+    </motion.div>
+  );
+};
+
+const GitHubAnalysis = ({ profile }) => {
+  const githubData = profile.github_analysis;
+
+  if (!githubData) return null;
+
+  return (
+    <motion.div
+      whileHover={{ scale: 1.01 }}
+      className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/50"
+    >
+      <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center">
+        <Github className="w-4 h-4 mr-2" />
+        GitHub Analysis
+        <span className="ml-2 px-2 py-1 bg-purple-600/20 text-purple-300 text-xs rounded">
+          Score: {githubData.github_score}/100
+        </span>
+      </h4>
+
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="bg-gray-900/30 rounded p-3">
+          <div className="text-lg font-bold text-blue-400">{githubData.public_repos}</div>
+          <div className="text-xs text-gray-400">Public Repos</div>
+        </div>
+        <div className="bg-gray-900/30 rounded p-3">
+          <div className="text-lg font-bold text-green-400">{githubData.followers}</div>
+          <div className="text-xs text-gray-400">Followers</div>
+        </div>
+        <div className="bg-gray-900/30 rounded p-3">
+          <div className="text-lg font-bold text-purple-400">{githubData.total_stars}</div>
+          <div className="text-xs text-gray-400">Total Stars</div>
+        </div>
+        <div className="bg-gray-900/30 rounded p-3">
+          <div className="text-lg font-bold text-orange-400">{githubData.total_forks}</div>
+          <div className="text-xs text-gray-400">Total Forks</div>
+        </div>
+      </div>
+
+      {githubData.top_languages && githubData.top_languages.length > 0 && (
+        <div className="mb-3">
+          <div className="text-xs text-gray-400 mb-1">Top Languages:</div>
+          <div className="flex flex-wrap gap-1">
+            {githubData.top_languages.map((lang, idx) => (
+              <span key={idx} className="px-2 py-1 bg-blue-600/20 text-blue-300 text-xs rounded">
+                {lang}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {githubData.project_types && githubData.project_types.length > 0 && (
+        <div>
+          <div className="text-xs text-gray-400 mb-1">Project Types:</div>
+          <div className="flex flex-wrap gap-1">
+            {githubData.project_types.map((type, idx) => (
+              <span key={idx} className="px-2 py-1 bg-green-600/20 text-green-300 text-xs rounded">
+                {type}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-3 flex items-center text-xs">
+        <a
+          href={`https://github.com/${githubData.username}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-purple-400 hover:text-purple-300 flex items-center"
+        >
+          View Profile <ExternalLink className="w-3 h-3 ml-1" />
+        </a>
       </div>
     </motion.div>
   );
