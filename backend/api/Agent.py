@@ -274,7 +274,7 @@ def student_profile_analyzer(state: AnalysisState) -> AnalysisState:
 def extract_detailed_info(resume_text):
     """Extract detailed information from resume text"""
     detailed_extraction = {
-        "total_characters": len(resume_text),
+        "total_characters  ": len(resume_text),
         "total_words": len(resume_text.split()),
         "total_lines": len(resume_text.split('\n')),
         "paragraphs": resume_text.count('\n\n') + 1,
@@ -672,7 +672,7 @@ def validate_and_enhance_profile(profile, preferences):
     """Validate and enhance profile"""
     profile.setdefault("name", "Unknown")
     profile.setdefault("skills", ["Python", "JavaScript"])
-    profile.setdefault("domains", preferences[:2] if preferences else ["Web Development"])
+    profile.setdefault("domains", preferences[:2] if preferences else ["None"])
     profile.setdefault("experience_level", "entry-level")
     
     # Ensure lists
@@ -691,7 +691,7 @@ def create_enhanced_fallback_profile(resume_text, preferences):
         "email": extract_email_from_text(resume_text),
         "phone": extract_phone_from_text(resume_text),
         "skills": extract_comprehensive_skills(resume_text),
-        "domains": preferences[:2] if preferences else ["Web Development"],
+        "domains": preferences[:2] if preferences else ["None"],
         "experience_level": "entry-level",
         "education": [],
         "experience": [],
