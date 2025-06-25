@@ -1590,42 +1590,83 @@ class ResumeAnalysisView(APIView):
                     "file_id": file_id,
                     "processed": True,
                     "chars_extracted": len(resume_text),
-                    "resume_text": resume_text[:3000] + "..." if len(resume_text) > 3000 else resume_text
-                }
+                    "resume_text": resume_text[:3000] + "..." if len(resume_text) > 3000 else resume_text                }
             }
             
-            # Save to MongoDB if available
-            analysis_id = None
-            if MONGODB_AVAILABLE and mongodb_service:
+            # Schedule MongoDB save for 2 seconds later (async to avoid blocking response)
+            import threading
+            
+            def delayed_save_to_mongodb():
+                """Save analysis to MongoDB after a 2-second delay"""
+                import time
+                time.sleep(2)  # Wait 2 seconds
+                
+                logger.info("🚀 Starting delayed MongoDB save process...")
+                
+                if not MONGODB_AVAILABLE or not mongodb_service:
+                    logger.warning("⚠️ MongoDB service not available - analysis not saved (delayed save)")
+                    return
+                
                 try:
-                    # Extract user_id from request (you might want to implement proper authentication)
-                    user_id = request.data.get("user_id", "anonymous")
+                    # First, test the connection
+                    logger.info("🔍 Testing MongoDB connection...")
+                    if not mongodb_service.is_connected():
+                        logger.info("🔄 MongoDB not connected, attempting to reconnect...")
+                        connection_success = mongodb_service.connect()
+                        if not connection_success:
+                            logger.error("❌ MongoDB reconnection failed - cannot save analysis")
+                            return
                     
-                    analysis_id = mongodb_service.save_analysis_result(response_data, user_id)
-                    if analysis_id:
-                        response_data["analysis_id"] = analysis_id
-                        logger.info(f"✅ Analysis saved to MongoDB with ID: {analysis_id}")
+                    # Verify connection is working
+                    if mongodb_service.is_connected():
+                        # Extract user_id from request
+                        user_id = request.data.get("user_id", "anonymous")
                         
-                        # Update dashboard cache with new analysis results
-                        readiness_score = None
-                        if final_state.get("readiness_evaluations"):
-                            # Calculate average readiness score
-                            scores = [eval.get("overall_score", 0) for eval in final_state["readiness_evaluations"]]
-                            readiness_score = round(sum(scores) / len(scores)) if scores else 0
+                        logger.info(f"💾 Saving analysis to MongoDB for user: {user_id}")
+                        analysis_id = mongodb_service.save_analysis_result(response_data, user_id)
                         
-                        internship_matches = len(final_state.get("internship_recommendations", []))
-                        gaps_detected = len(final_state.get("portfolio_gaps", []))
-                        
-                        # Import the cache update function
-                        from .views import update_analysis_cache
-                        update_analysis_cache(readiness_score, internship_matches, gaps_detected)
-                        logger.info(f"✅ Dashboard cache updated: score={readiness_score}, matches={internship_matches}, gaps={gaps_detected}")
-                        
+                        if analysis_id:
+                            logger.info(f"✅ Analysis saved to MongoDB with ID: {analysis_id} (delayed save)")
+                            
+                            # Update dashboard cache with new analysis results
+                            readiness_score = None
+                            if final_state.get("readiness_evaluations"): 
+                                # Calculate average readiness score
+                                scores = [eval.get("overall_score", 0) for eval in final_state["readiness_evaluations"]]
+                                readiness_score = round(sum(scores) / len(scores)) if scores else 0
+                            
+                            internship_matches = len(final_state.get("internship_recommendations", []))
+                            gaps_detected = len(final_state.get("portfolio_gaps", []))
+                            
+                            # Import the cache update function
+                            try:
+                                from .views import update_analysis_cache
+                                update_analysis_cache(readiness_score, internship_matches, gaps_detected)
+                                logger.info(f"✅ Dashboard cache updated: score={readiness_score}, matches={internship_matches}, gaps={gaps_detected}")
+                            except Exception as cache_error:
+                                logger.warning(f"⚠️ Cache update failed: {str(cache_error)}")
+                            
+                        else:
+                            logger.warning("⚠️ Failed to save analysis to MongoDB - no ID returned (delayed save)")
                     else:
-                        logger.warning("⚠️ Failed to save analysis to MongoDB")
+                        logger.warning("⚠️ MongoDB connection verification failed")
                         
                 except Exception as e:
-                    logger.error(f"❌ MongoDB save error: {str(e)}")
+                    logger.error(f"❌ MongoDB delayed save error: {str(e)}")
+                    # Try to get connection diagnostics
+                    try:
+                        diagnostics = mongodb_service.test_connection()
+                        logger.error(f"📊 Connection diagnostics: {diagnostics}")
+                    except Exception:
+                        logger.error("📊 Could not retrieve connection diagnostics")
+            
+            # Start the delayed save in a background thread
+            if MONGODB_AVAILABLE and mongodb_service:
+                save_thread = threading.Thread(target=delayed_save_to_mongodb, daemon=True)
+                save_thread.start()
+                logger.info("� Scheduled MongoDB save for 2 seconds later (background thread started)")
+            else:
+                logger.warning("⚠️ MongoDB service not available - skipping delayed save")
             
             return Response(response_data, status=status.HTTP_200_OK)
             
@@ -2115,13 +2156,23 @@ def generate_intelligent_gaps(profile, recommendations):
                 f"Practice projects incorporating {skill.title()}"
             ]
         })
-    
-    # 2. Programming Language Gaps
+      # 2. Programming Language Gaps
     missing_languages = all_required_languages - student_languages
     for lang in list(missing_languages)[:2]:  # Top 2 missing languages
         gaps.append({
             "category": "programming_languages",
-            "skill_name": lang
+            "skill_name": lang.title(),
+            "type": "programming_language",
+            "title": f"Missing {lang.title()} Programming Language",
+            "description": f"Learn {lang.title()} programming language to match internship requirements",
+            "priority": "medium",
+            "suggested_action": f"Complete {lang.title()} tutorials and build practice projects",
+            "impact": f"Increases matching score for {len([r for r in recommendations if lang in [req.lower() for req in r.get('requirements', [])]])} internships",
+            "learning_resources": [
+                f"Official {lang.title()} documentation",
+                f"{lang.title()} coding challenges",
+                f"Build projects using {lang.title()}"
+            ]
         })
     
     # 6. Professional Experience Gaps

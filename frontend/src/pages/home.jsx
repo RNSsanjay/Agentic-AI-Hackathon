@@ -200,7 +200,7 @@ const Home = () => {
     },
     {
       label: 'Available Internships',
-      value: loading ? '...' : '50+',
+      value: loading ? '...' : '20+',
       change: 'Ready for matching',
       icon: loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Briefcase className="w-5 h-5" />,
       color: 'text-blue-400',
@@ -604,6 +604,44 @@ const Home = () => {
           </div>
         </motion.div>
       )}
+      {/* Custom Scrollbar Styles */}
+      <style jsx>{`
+        .overflow-x-auto::-webkit-scrollbar {
+          height: 8px;
+        }
+        .overflow-x-auto::-webkit-scrollbar-track {
+          background: rgba(31, 41, 55, 0.5);
+          border-radius: 4px;
+        }
+        .overflow-x-auto::-webkit-scrollbar-thumb {
+          background: linear-gradient(90deg, rgba(99, 102, 241, 0.7), rgba(147, 51, 234, 0.7));
+          border-radius: 4px;
+        }
+        .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(90deg, rgba(99, 102, 241, 0.9), rgba(147, 51, 234, 0.9));
+        }
+        
+        /* Smooth scrolling */
+        .overflow-x-auto {
+          scroll-behavior: smooth;
+        }
+        
+        /* Enhanced animations */
+        @keyframes slideInRight {
+          from {
+            transform: translateX(100px);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        
+        .animate-slide-in {
+          animation: slideInRight 0.6s ease-out forwards;
+        }
+      `}</style>
     </div>
   );
 };
@@ -613,7 +651,7 @@ const WelcomeSection = ({ user, navigate }) => (
     <div className="flex items-center justify-between">
       <div>
         <h2 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
-          Welcome to InternAI, {user?.first_name || 'Student'}! 🤖
+          Welcome to InternAI, {user?.first_name || 'Student'}! <span className="ml-2 text-black" role="img" aria-label="robot"> 🤖 </span>
         </h2>
         <p className="text-blue-400 text-lg">
           AI-powered resume analysis for intelligent internship matching.
@@ -1568,9 +1606,7 @@ const TechnicalSkills = ({ profile }) => (
           items={profile.databases}
           color="orange"
         />
-      )}
-
-      {(!profile.programming_languages?.length &&
+      )}      {(!profile.programming_languages?.length &&
         !profile.frameworks?.length &&
         !profile.tools?.length &&
         !profile.databases?.length) &&
@@ -1722,10 +1758,39 @@ const InternshipRecommendations = ({ analysisResults }) => {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
-        {recommendations.map((rec, index) => (
-          <InternshipCard key={index} rec={rec} index={index} />
-        ))}
+      {/* Horizontal Scrolling Container */}
+      <div className="relative mb-6 overflow-hidden">
+        <motion.div 
+          className="flex gap-6 pb-4"
+          style={{ 
+            overflowX: 'auto',
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#6366f1 #1f2937'
+          }}
+          initial={{ x: -50 }}
+          animate={{ x: 0 }}
+          transition={{ duration: 0.8 }}
+        >
+          {recommendations.map((rec, index) => (
+            <motion.div
+              key={index}
+              className="flex-shrink-0 w-80"
+              initial={{ opacity: 0, x: 100 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ 
+                delay: index * 0.1,
+                duration: 0.6,
+                type: "spring",
+                stiffness: 100
+              }}
+            >
+              <InternshipCard rec={rec} index={index} />
+            </motion.div>
+          ))}
+        </motion.div>
+        
+        {/* Gradient Fade Effect */}
+        <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-gray-900/50 to-transparent pointer-events-none" />
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-gray-700/30">
@@ -1734,6 +1799,45 @@ const InternshipRecommendations = ({ analysisResults }) => {
         <StatCard value={uniqueDomains} label="Domains" color="blue" />
         <StatCard value={highMatchCount} label="High Match" color="yellow" />
       </div>
+
+      {/* Custom Scrollbar Styles */}
+      <style jsx>{`
+        .overflow-x-auto::-webkit-scrollbar {
+          height: 8px;
+        }
+        .overflow-x-auto::-webkit-scrollbar-track {
+          background: rgba(31, 41, 55, 0.5);
+          border-radius: 4px;
+        }
+        .overflow-x-auto::-webkit-scrollbar-thumb {
+          background: linear-gradient(90deg, rgba(99, 102, 241,  0.7), rgba(147, 51, 234, 0.7));
+          border-radius: 4px;
+        }
+        .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(90deg, rgba(99, 102, 241, 0.9), rgba(147, 51, 234, 0.9));
+        }
+        
+        /* Smooth scrolling */
+        .overflow-x-auto {
+          scroll-behavior: smooth;
+        }
+        
+        /* Enhanced animations */
+        @keyframes slideInRight {
+          from {
+            transform: translateX(100px);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        
+        .animate-slide-in {
+          animation: slideInRight 0.6s ease-out forwards;
+        }
+      `}</style>
     </motion.div>
   );
 };
@@ -2673,7 +2777,7 @@ const QuickActionsCard = ({ analysisResults, showAgentComm, setShowAgentComm, se
                 URL.revokeObjectURL(url);
                 toast.success('Analysis downloaded successfully!');
               }}
-              className="w-full flex items-center justify-between p-3 bg-gradient-to-r from-green-600/20 to-teal-600/20 hover:from-green-600/30 hover:to-teal-600/30 rounded-lg border border-green-500/20 transition-all"
+              className="w-full flex items-center justify-between p-3 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-600/30 hover:to-teal-600/30 rounded-lg border border-green-500/20 transition-all"
             >
               <div className="flex items-center">
                 <Download className="w-4 h-4 mr-3 text-green-400" />

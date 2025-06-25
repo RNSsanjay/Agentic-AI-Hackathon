@@ -22,6 +22,6 @@ urlpatterns = [
     path('analysis/<str:analysis_id>/delete/', views.delete_analysis, name='delete_analysis'),
     path('analysis/statistics/', views.get_analysis_statistics, name='get_analysis_statistics'),
    
-    
-    # Health check endpoint
+      # Health check endpoint
+    path('test/mongodb/', views.test_mongodb_connection, name='test_mongodb_connection'),
 ]

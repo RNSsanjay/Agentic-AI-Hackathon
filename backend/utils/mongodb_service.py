@@ -16,11 +16,57 @@ def ensure_connection(func):
     """Decorator to ensure MongoDB connection before executing method"""
     @wraps(func)
     def wrapper(self, *args, **kwargs):
-        if not self.is_connected():
-            self.connect()
-        if not self.is_connected():
-            raise ConnectionError("MongoDB is not connected")
-        return func(self, *args, **kwargs)
+        max_retries = 3
+        for attempt in range(max_retries):
+            if not self.is_connected():
+                logger.info(f"🔄 MongoDB not connected, attempting connection (attempt {attempt + 1}/{max_retries})")
+                try:
+                    self.connect()
+                except Exception as e:
+                    logger.warning(f"⚠️ Connection attempt {attempt + 1} failed: {str(e)}")
+                    if attempt == max_retries - 1:
+                        logger.error("❌ All connection attempts failed")
+                        # Return default values based on function name
+                        if func.__name__ == 'get_analysis_statistics':
+                            return {
+                                "total_analyses": 0,
+                                "avg_readiness_score": 0.0,
+                                "total_internships_matched": 0,
+                                "total_gaps_detected": 0,
+                                "last_analysis_date": None,
+                                "has_github_analyses": 0
+                            }
+                        elif func.__name__ == 'get_analysis_history':
+                            return []
+                        elif func.__name__ == 'save_analysis_result':
+                            return None
+                        else:
+                            raise ConnectionError("MongoDB is not connected")
+                    continue
+            
+            if self.is_connected():
+                try:
+                    return func(self, *args, **kwargs)
+                except Exception as e:
+                    logger.error(f"❌ Function {func.__name__} failed: {str(e)}")
+                    # Return defaults for specific functions
+                    if func.__name__ == 'get_analysis_statistics':
+                        return {
+                            "total_analyses": 0,
+                            "avg_readiness_score": 0.0,
+                            "total_internships_matched": 0,
+                            "total_gaps_detected": 0,
+                            "last_analysis_date": None,
+                            "has_github_analyses": 0
+                        }
+                    elif func.__name__ == 'get_analysis_history':
+                        return []
+                    elif func.__name__ == 'save_analysis_result':
+                        return None
+                    else:
+                        raise e
+        
+        raise ConnectionError("Could not establish MongoDB connection after multiple attempts")
     return wrapper
 
 class MongoDBService:
@@ -42,8 +88,14 @@ class MongoDBService:
             self.collection = None
             self.analysis_collection = None
             self._initialized = False
-            self._validate_config()
-            self.connect()
+            
+            # Try to validate config and connect, but don't fail on initialization
+            try:
+                self._validate_config()
+                self.connect()
+            except Exception as e:
+                logger.warning(f"⚠️ MongoDB initialization warning: {str(e)}")
+                logger.info("🔄 MongoDB will attempt to connect on first use")
 
     def _validate_config(self):
         """Validate MongoDB configuration settings"""
@@ -56,32 +108,49 @@ class MongoDBService:
             if not hasattr(settings, setting):
                 raise ConfigurationError(f"Missing required setting: {setting}")
 
-    def connect(self, max_retries: int = 3, retry_delay: float = 2.0):
+    def connect(self, max_retries: int = 5, retry_delay: float = 1.5):
         """Connect to MongoDB with retry mechanism"""
         if self.is_connected():
-            return
+            return True
 
+        logger.info(f"🔄 Attempting MongoDB connection (max {max_retries} retries)...")
+        
         for attempt in range(max_retries):
             try:
                 self.client = MongoClient(
                     settings.MONGODB_URI,
-                    serverSelectionTimeoutMS=5000,
-                    connectTimeoutMS=10000,
-                    socketTimeoutMS=10000
+                    serverSelectionTimeoutMS=8000,
+                    connectTimeoutMS=15000,
+                    socketTimeoutMS=15000,
+                    maxPoolSize=10,
+                    retryWrites=True,
+                    retryReads=True
                 )
                 self.db = self.client[settings.MONGODB_DATABASE]
                 self.collection = self.db[settings.MONGODB_COLLECTION]
                 self.analysis_collection = self.db["analysis_results"]
 
-                # Test connection
+                # Test connection with a simple ping
                 self.client.admin.command('ping')
                 self._initialized = True
-                self.create_indexes()
-                logger.info("✅ MongoDB connected successfully")
-                return
+                
+                # Create indexes after successful connection
+                try:
+                    self.create_indexes()
+                except Exception as index_error:
+                    logger.warning(f"⚠️ Index creation failed: {str(index_error)} (continuing anyway)")
+                
+                logger.info(f"✅ MongoDB connected successfully on attempt {attempt + 1}")
+                return True
 
             except (ConnectionFailure, ConfigurationError) as e:
-                logger.error(f"❌ MongoDB connection attempt {attempt + 1}/{max_retries} failed: {str(e)}")
+                logger.warning(f"❌ MongoDB connection attempt {attempt + 1}/{max_retries} failed: {str(e)}")
+                if attempt < max_retries - 1:
+                    sleep(retry_delay)
+                    retry_delay *= 1.5  # Exponential backoff
+                continue
+            except Exception as e:
+                logger.error(f"❌ Unexpected error during MongoDB connection: {str(e)}")
                 if attempt < max_retries - 1:
                     sleep(retry_delay)
                 continue
@@ -89,6 +158,7 @@ class MongoDBService:
         logger.error("❌ Failed to connect to MongoDB after all retries")
         self._initialized = False
         self.client = None
+        return False
 
     def is_connected(self) -> bool:
         """Check if MongoDB is connected"""
@@ -221,6 +291,17 @@ class MongoDBService:
             query = {"user_id": user_id} if user_id else {}
             total_analyses = self.analysis_collection.count_documents(query)
 
+            if total_analyses == 0:
+                # Return empty stats for empty collection
+                return {
+                    "total_analyses": 0,
+                    "avg_readiness_score": 0.0,
+                    "total_internships_matched": 0,
+                    "total_gaps_detected": 0,
+                    "last_analysis_date": None,
+                    "has_github_analyses": 0
+                }
+
             pipeline = [
                 {"$match": query},
                 {"$group": {
@@ -248,7 +329,14 @@ class MongoDBService:
 
         except Exception as e:
             logger.error(f"❌ Error retrieving statistics: {str(e)}")
-            return {}
+            return {
+                "total_analyses": 0,
+                "avg_readiness_score": 0.0,
+                "total_internships_matched": 0,
+                "total_gaps_detected": 0,
+                "last_analysis_date": None,
+                "has_github_analyses": 0
+            }
 
     @ensure_connection
     def delete_analysis(self, analysis_id: str) -> bool:
@@ -363,3 +451,45 @@ class MongoDBService:
     def __del__(self):
         """Ensure connection is closed when object is deleted"""
         self.close_connection()
+
+    @ensure_connection
+    def test_connection(self) -> Dict[str, Any]:
+        """Test MongoDB connection and return diagnostics"""
+        try:
+            if not self.client:
+                return {
+                    "connected": False,
+                    "error": "No MongoDB client initialized",
+                    "suggestion": "Check MongoDB configuration settings"
+                }
+            
+            # Test basic connectivity
+            self.client.admin.command('ping')
+            
+            # Test database access
+            db_stats = self.db.command('dbstats')
+            
+            # Test collection access
+            collection_count = self.analysis_collection.count_documents({})
+            
+            return {
+                "connected": True,
+                "database": settings.MONGODB_DATABASE,
+                "collection": "analysis_results",
+                "document_count": collection_count,
+                "db_size_mb": round(db_stats.get('dataSize', 0) / (1024 * 1024), 2),
+                "server_info": self.client.server_info().get('version', 'Unknown')
+            }
+            
+        except Exception as e:
+            return {
+                "connected": False,
+                "error": str(e),
+                "suggestion": "Check MongoDB service status and configuration"
+            }
+
+# Create MongoDB service instance
+mongodb_service = MongoDBService()
+
+# Export for easier imports
+__all__ = ['mongodb_service', 'MongoDBService']
