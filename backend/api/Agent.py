@@ -1593,6 +1593,37 @@ class ResumeAnalysisView(APIView):
                     "resume_text": resume_text[:3000] + "..." if len(resume_text) > 3000 else resume_text                }
             }
             
+            # ⚡ IMMEDIATELY UPDATE CACHE FOR REAL-TIME DASHBOARD STATS ⚡
+            # Update cache immediately so frontend gets real-time data, not just after DB save
+            try:
+                readiness_score = 0
+                if final_state.get("readiness_evaluations"):
+                    # Calculate average readiness score - try multiple score fields
+                    scores = []
+                    for eval in final_state["readiness_evaluations"]:
+                        if isinstance(eval, dict):
+                            score = (eval.get("readiness_score") or 
+                                   eval.get("overall_score") or 
+                                   eval.get("score") or 
+                                   eval.get("internship_readiness_score", 0))
+                            if score:
+                                # Convert to percentage if needed
+                                if isinstance(score, (int, float)):
+                                    scores.append(float(score) * 100 if score <= 1 else float(score))
+                    
+                    readiness_score = round(sum(scores) / len(scores)) if scores else 0
+                
+                internship_matches = len(final_state.get("best_fit_internships", []))
+                gaps_detected = len(final_state.get("portfolio_gaps", []))
+                
+                # Import and call the cache update function immediately
+                from .views import update_analysis_cache
+                update_analysis_cache(readiness_score, internship_matches, gaps_detected)
+                logger.info(f"⚡ IMMEDIATE cache update: score={readiness_score}, matches={internship_matches}, gaps={gaps_detected}")
+                
+            except Exception as cache_error:
+                logger.warning(f"⚠️ Immediate cache update failed: {str(cache_error)}")
+            
             # Schedule MongoDB save for 2 seconds later (async to avoid blocking response)
             import threading
             
@@ -1629,10 +1660,21 @@ class ResumeAnalysisView(APIView):
                             logger.info(f"✅ Analysis saved to MongoDB with ID: {analysis_id} (delayed save)")
                             
                             # Update dashboard cache with new analysis results
-                            readiness_score = None
-                            if final_state.get("readiness_evaluations"): 
-                                # Calculate average readiness score
-                                scores = [eval.get("overall_score", 0) for eval in final_state["readiness_evaluations"]]
+                            readiness_score = 0
+                            if final_state.get("readiness_evaluations"):
+                                # Calculate average readiness score - try multiple score fields
+                                scores = []
+                                for eval in final_state["readiness_evaluations"]:
+                                    if isinstance(eval, dict):
+                                        score = (eval.get("readiness_score") or 
+                                               eval.get("overall_score") or 
+                                               eval.get("score") or 
+                                               eval.get("internship_readiness_score", 0))
+                                        if score:
+                                            # Convert to percentage if needed
+                                            if isinstance(score, (int, float)):
+                                                scores.append(float(score) * 100 if score <= 1 else float(score))
+                                
                                 readiness_score = round(sum(scores) / len(scores)) if scores else 0
                             
                             internship_matches = len(final_state.get("internship_recommendations", []))

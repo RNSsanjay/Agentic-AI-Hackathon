@@ -189,15 +189,56 @@ class MongoDBService:
 
             logger.info("✅ MongoDB indexes created successfully")
         except Exception as e:
-            logger.warning(f"⚠️ Index creation warning: {str(e)}")
-
-    @ensure_connection
+            logger.warning(f"⚠️ Index creation warning: {str(e)}")    @ensure_connection
     def save_analysis_result(self, analysis_data: Dict[str, Any], user_id: str = None) -> Optional[str]:
         """Save analysis result to MongoDB"""
         try:
             if not analysis_data:
                 logger.error("No analysis data provided")
                 return None
+
+            if self.analysis_collection is None:
+                logger.error("Analysis collection not available")
+                return None
+
+            # Generate unique analysis ID
+            analysis_id = str(ObjectId())
+            
+            # Prepare document
+            document = {
+                "analysis_id": analysis_id,
+                "user_id": user_id or "anonymous",
+                "timestamp": datetime.utcnow(),
+                "student_profile": analysis_data.get("student_profile", {}),
+                "internship_recommendations": analysis_data.get("internship_recommendations", []),
+                "portfolio_gaps": analysis_data.get("portfolio_gaps", []),
+                "rag_aligned_requirements": analysis_data.get("rag_aligned_requirements", {}),
+                "readiness_evaluations": analysis_data.get("readiness_evaluations", []),
+                "extraction_info": analysis_data.get("extraction_info", {}),
+                "detailed_extraction": analysis_data.get("detailed_extraction", {}),
+                "agent_communications": analysis_data.get("agent_communications", []),
+                "processing_timestamp": analysis_data.get("processing_timestamp"),
+                "file_info": analysis_data.get("file_info", {}),
+                "github_analysis": analysis_data.get("student_profile", {}).get("github_analysis"),
+                "overall_readiness_score": self._calculate_overall_score(analysis_data),
+                "total_internships_matched": len(analysis_data.get("internship_recommendations", [])),
+                "total_gaps_detected": len(analysis_data.get("portfolio_gaps", [])),
+                "analysis_summary": self._generate_analysis_summary(analysis_data)
+            }
+            
+            # Insert document
+            result = self.analysis_collection.insert_one(document)
+            
+            if result.inserted_id:
+                logger.info(f"✅ Analysis result saved with ID: {analysis_id}")
+                return analysis_id
+            else:
+                logger.error("❌ Failed to save analysis result")
+                return None
+                
+        except Exception as e:
+            logger.error(f"❌ Error saving analysis result: {str(e)}")
+            return None
 
             analysis_id = str(ObjectId())
             document = {
@@ -358,84 +399,88 @@ class MongoDBService:
             return False
 
     @ensure_connection
-    def search_analyses(self, search_term: str, user_id: str = None, limit: int = 20) -> List[Dict]:
-        """Search analyses by student name, skills, or other criteria"""
+    def search_analyses(self, search_term: str, user_id: str = None, limit: int = 50) -> List[Dict]:
+        """Search analyses by term"""
         try:
-            if not search_term:
-                return []
-
-            search_query = {
-                "$or": [
+            query = {"user_id": user_id} if user_id else {}
+            
+            # Add text search
+            if search_term:
+                query["$or"] = [
+                    {"analysis_summary": {"$regex": search_term, "$options": "i"}},
                     {"student_profile.name": {"$regex": search_term, "$options": "i"}},
-                    {"student_profile.skills": {"$regex": search_term, "$options": "i"}},
-                    {"student_profile.domains": {"$regex": search_term, "$options": "i"}},
-                    {"analysis_summary": {"$regex": search_term, "$options": "i"}}
+                    {"student_profile.skills": {"$regex": search_term, "$options": "i"}}
                 ]
-            }
-
-            if user_id:
-                search_query = {"$and": [{"user_id": user_id}, search_query]}
-
-            cursor = self.analysis_collection.find(search_query).sort("timestamp", -1).limit(max(1, limit))
-            results = []
-            for doc in cursor:
-                doc["_id"] = str(doc["_id"])
-                summary = {
-                    "analysis_id": doc["analysis_id"],
-                    "user_id": doc["user_id"],
-                    "timestamp": doc["timestamp"],
-                    "student_name": doc.get("student_profile", {}).get("name", "Unknown"),
-                    "overall_readiness_score": doc.get("overall_readiness_score", 0.0),
-                    "total_internships_matched": doc.get("total_internships_matched", 0),
-                    "analysis_summary": doc.get("analysis_summary", ""),
-                    "primary_skills": doc.get("student_profile", {}).get("skills", [])[:3],
-                    "match_reason": "Name, skills, or summary match"
-                }
-                results.append(summary)
-
+            
+            results = list(self.analysis_collection.find(query)
+                          .sort("timestamp", -1)
+                          .limit(limit))
+            
+            # Convert ObjectId to string for JSON serialization
+            for result in results:
+                result["_id"] = str(result["_id"])
+            
             return results
-
+            
         except Exception as e:
             logger.error(f"❌ Error searching analyses: {str(e)}")
             return []
 
-    def _calculate_overall_score(self, analysis_data: Dict) -> float:
+    def _calculate_overall_score(self, analysis_data: Dict[str, Any]) -> float:
         """Calculate overall readiness score from analysis data"""
         try:
             readiness_evaluations = analysis_data.get("readiness_evaluations", [])
-            if not readiness_evaluations:
-                return 0.0
-
-            overall_eval = readiness_evaluations[0]
-            score = float(overall_eval.get("readiness_score", 0.0))
-            return round(score * 100 if score <= 1.0 else score, 1)
-
-        except (ValueError, IndexError, TypeError) as e:
-            logger.warning(f"⚠️ Error calculating overall score: {str(e)}")
+            if readiness_evaluations:
+                scores = []
+                for eval in readiness_evaluations:
+                    if isinstance(eval, dict):
+                        # Try different score fields
+                        score = eval.get("readiness_score") or eval.get("overall_score") or eval.get("score")
+                        if score is not None:
+                            scores.append(float(score))
+                
+                if scores:
+                    return round(sum(scores) / len(scores), 2)
+            
+            # Fallback calculation
+            internship_count = len(analysis_data.get("internship_recommendations", []))
+            gaps_count = len(analysis_data.get("portfolio_gaps", []))
+            
+            # Simple scoring: more matches = higher score, more gaps = lower score
+            base_score = min(90, 50 + (internship_count * 5))
+            penalty = min(20, gaps_count * 2)
+            
+            return max(0, round(base_score - penalty, 2))
+            
+        except Exception as e:
+            logger.warning(f"Score calculation failed: {str(e)}")
             return 0.0
 
-    def _generate_analysis_summary(self, analysis_data: Dict) -> str:
-        """Generate a brief summary of the analysis"""
+    def _generate_analysis_summary(self, analysis_data: Dict[str, Any]) -> str:
+        """Generate a summary of the analysis"""
         try:
             profile = analysis_data.get("student_profile", {})
+            internships = analysis_data.get("internship_recommendations", [])
+            gaps = analysis_data.get("portfolio_gaps", [])
+            
+            name = profile.get("name", "Student")
+            skills_count = len(profile.get("skills", []))
+            
             summary_parts = [
-                f"{profile.get('name', 'Student')} ({profile.get('experience_level', 'entry-level')})",
-                f"{len(analysis_data.get('internship_recommendations', []))} internships matched",
-                f"{len(analysis_data.get('portfolio_gaps', []))} areas for improvement"
+                f"Analysis for {name}",
+                f"{skills_count} skills identified",
+                f"{len(internships)} internship matches found",
+                f"{len(gaps)} portfolio gaps detected"
             ]
-
-            if skills := profile.get("skills", [])[:3]:
-                summary_parts.append(f"Skills: {', '.join(str(s) for s in skills)}")
-
-            if github_analysis := profile.get("github_analysis"):
-                github_score = github_analysis.get("github_score", 0)
-                summary_parts.append(f"GitHub Score: {github_score}/100")
-
-            return " | ".join(str(part) for part in summary_parts)
-
+            
+            if profile.get("github_analysis"):
+                summary_parts.append("GitHub profile analyzed")
+            
+            return " | ".join(summary_parts)
+            
         except Exception as e:
-            logger.warning(f"⚠️ Error generating analysis summary: {str(e)}")
-            return "Analysis completed successfully"
+            logger.warning(f"Summary generation failed: {str(e)}")
+            return "Analysis completed"
 
     def close_connection(self):
         """Close MongoDB connection"""
@@ -459,36 +504,37 @@ class MongoDBService:
             if not self.client:
                 return {
                     "connected": False,
-                    "error": "No MongoDB client initialized",
-                    "suggestion": "Check MongoDB configuration settings"
+                    "error": "No client initialized",
+                    "details": {"client": "Not initialized"}
                 }
             
-            # Test basic connectivity
+            # Test connection with ping
             self.client.admin.command('ping')
             
-            # Test database access
-            db_stats = self.db.command('dbstats')
-            
-            # Test collection access
-            collection_count = self.analysis_collection.count_documents({})
+            # Test collections access
+            collections_info = {}
+            if self.db:
+                collections_info["database"] = self.db.name
+                collections_info["collections"] = self.db.list_collection_names()
             
             return {
                 "connected": True,
-                "database": settings.MONGODB_DATABASE,
-                "collection": "analysis_results",
-                "document_count": collection_count,
-                "db_size_mb": round(db_stats.get('dataSize', 0) / (1024 * 1024), 2),
-                "server_info": self.client.server_info().get('version', 'Unknown')
+                "details": {
+                    "client": "Connected",
+                    "database": collections_info.get("database", "Unknown"),
+                    "collections": collections_info.get("collections", []),
+                    "analysis_collection_exists": "analysis_results" in collections_info.get("collections", [])
+                }
             }
             
         except Exception as e:
             return {
                 "connected": False,
                 "error": str(e),
-                "suggestion": "Check MongoDB service status and configuration"
+                "details": {"error_type": type(e).__name__}
             }
 
-# Create MongoDB service instance
+# Create singleton instance
 mongodb_service = MongoDBService()
 
 # Export for easier imports

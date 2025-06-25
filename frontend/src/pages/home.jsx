@@ -3,15 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../contexts/AuthContext';
-import {
-  FileText, Brain, Target, BarChart3, Upload, Github, Clock,
-  AlertCircle, Star, CheckCircle, User, Award, TrendingUp, RefreshCw,
-  Eye, EyeOff, MessageSquare, Activity, Zap, ChevronDown, ChevronUp,
-  Code, Database, Globe, Briefcase, Mail, Phone, MapPin,
-  Calendar, ExternalLink, Copy, Download, Share2, Building,
-  DollarSign, Timer, Sparkles, ArrowRight, BookmarkPlus,
-  Filter, Search, Heart, Users, Laptop
-} from 'lucide-react';
+import { FileText, Brain, Target, BarChart3, Upload, Github, Clock, AlertCircle, Star, CheckCircle, User, Award, TrendingUp, RefreshCw, Eye, EyeOff, MessageSquare, Activity, Zap, ChevronDown, ChevronUp, Code, Database, Globe, Briefcase, Mail, Phone, MapPin, Calendar, ExternalLink, Copy, Download, Share2, Building, DollarSign, Timer, Sparkles, ArrowRight, BookmarkPlus, Filter, Search, Heart, Users, Laptop } from 'lucide-react';
 import { toast } from 'react-toastify';
 import axios from 'axios';
 
@@ -84,7 +76,6 @@ const pulseVariants = {
 };
 
 const Home = () => {
-  // State management
   const { user } = useAuth();
   const navigate = useNavigate();
   const [analysisResults, setAnalysisResults] = useState(null);
@@ -104,7 +95,6 @@ const Home = () => {
   const [recentActivity, setRecentActivity] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch data on component mount
   useEffect(() => {
     fetchDashboardData();
   }, []);
@@ -113,16 +103,22 @@ const Home = () => {
     try {
       setLoading(true);
 
-      // Fetch internships
+      // Fetch internships (always needed for available count)
       const internshipsResponse = await axios.get('http://127.0.0.1:8000/api/internships/');
       if (internshipsResponse.data.status === 'success') {
         setInternships(internshipsResponse.data.internships);
       }
 
-      // Fetch dashboard stats
+      // Only fetch dashboard stats to check if using_real_data is true
+      // If no real analysis data exists, we'll show zeros
       const statsResponse = await axios.get('http://127.0.0.1:8000/api/dashboard/stats/');
       if (statsResponse.data.status === 'success') {
-        setDashboardStats(statsResponse.data.stats);
+        // Only set dashboardStats if there's real analysis data, otherwise keep it null for zero state
+        if (statsResponse.data.stats.using_real_data) {
+          setDashboardStats(statsResponse.data.stats);
+        } else {
+          setDashboardStats(null); // Force zero state when no real analysis data
+        }
       }
 
       // Fetch recent activity
@@ -139,41 +135,50 @@ const Home = () => {
     }
   };
 
-  // Generate dashboard stats from real data - Start with zeros, update with actual data
-  const dashboardStatsData = dashboardStats && dashboardStats.using_real_data ? [
+  // ⚡ REAL-TIME DASHBOARD STATS LOGIC ⚡
+  // Priority: 1) Fresh analysis results (analysisResults) 2) Zero state (no database fallback)
+  // This ensures home page shows real-time analysis data immediately, not stale DB values
+  const dashboardStatsData = analysisResults ? [
+    // PRIORITY #1: Fresh analysis results - show real-time data
     {
       label: 'Readiness Score',
-      value: `${dashboardStats.readiness_score || 0}%`,
-      change: 'Your internship readiness',
+      value: analysisResults.readiness_evaluations?.[0]
+        ? `${Math.round(analysisResults.readiness_evaluations[0].readiness_score * 100) ||
+        Math.round(analysisResults.readiness_evaluations[0].overall_score * 100) ||
+        Math.round(analysisResults.readiness_evaluations[0].internship_readiness_score * 100) || 75}%`
+        : '75%',
+      change: 'Real-time analysis result',
       icon: <Star className="w-5 h-5" />,
       color: 'text-yellow-400',
       bgColor: 'from-yellow-600/20 to-yellow-400/20'
     },
     {
       label: 'Internship Matches',
-      value: dashboardStats.internship_match_count || 0,
-      change: 'Opportunities found',
+      value: analysisResults.internship_recommendations?.length || 0,
+      change: 'Live matching results',
       icon: <Target className="w-5 h-5" />,
       color: 'text-green-400',
       bgColor: 'from-green-600/20 to-green-400/20'
     },
     {
       label: 'Gaps Detected',
-      value: dashboardStats.gaps_detected || 0,
-      change: 'Areas to improve',
+      value: analysisResults.portfolio_gaps?.length || 0,
+      change: 'Current analysis gaps',
       icon: <AlertCircle className="w-5 h-5" />,
       color: 'text-red-400',
       bgColor: 'from-red-600/20 to-red-400/20'
     },
     {
-      label: 'Available Internships',
-      value: dashboardStats.total_available_internships || 0,
-      change: 'Total opportunities',
-      icon: <Briefcase className="w-5 h-5" />,
-      color: 'text-blue-400',
-      bgColor: 'from-blue-600/20 to-blue-400/20'
+      label: 'Skills Identified',
+      value: analysisResults.student_profile?.skills?.length || 0,
+      change: 'Extracted from resume',
+      icon: <Brain className="w-5 h-5" />,
+      color: 'text-purple-400',
+      bgColor: 'from-purple-600/20 to-purple-400/20'
     }
   ] : [
+    // PRIORITY #2: Zero state - always show zeros when no analysis results
+    // No database fallback to ensure clean zero state
     {
       label: 'Readiness Score',
       value: '0%',
@@ -200,7 +205,7 @@ const Home = () => {
     },
     {
       label: 'Available Internships',
-      value: loading ? '...' : '20+',
+      value: loading ? '...' : internships?.length || '20+',
       change: 'Ready for matching',
       icon: loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Briefcase className="w-5 h-5" />,
       color: 'text-blue-400',
@@ -208,7 +213,6 @@ const Home = () => {
     }
   ];
 
-  // Derived state for activity
   const activityData = analysisResults ? [
     {
       title: 'Resume analyzed with GitHub integration',
@@ -281,7 +285,6 @@ const Home = () => {
     { label: 'Portfolio Gaps', value: '0', change: 'Analysis pending', icon: <AlertCircle className="w-5 h-5" />, color: 'text-gray-400' }
   ];
 
-  // Helper functions
   const validateFile = (file) => {
     const errors = [];
     if (!file) errors.push('Please select a file');
@@ -309,13 +312,11 @@ const Home = () => {
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     const fileErrors = validateFile(file);
-
     if (fileErrors.length > 0) {
       setError(fileErrors.join('. '));
       toast.error(fileErrors[0]);
       return;
     }
-
     setUploadedResume(file);
     setError('');
     await analyzeResume(file);
@@ -327,18 +328,15 @@ const Home = () => {
       toast.error('Please select at least one domain preference');
       return;
     }
-
     setIsAnalyzing(true);
     setError('');
     setProgress(0);
-
     const formData = new FormData();
     formData.append('resume', file);
     formData.append('preferences', JSON.stringify(selectedPreferences));
     if (githubLink.trim()) {
       formData.append('github_link', githubLink.trim());
     }
-
     const steps = [
       'Uploading resume and GitHub profile...',
       'Student Profile Analyzer → Extracting skills and domains...',
@@ -348,7 +346,6 @@ const Home = () => {
       'Readiness Evaluator → Calculating readiness scores...',
       'Generating personalized preparation plan...'
     ];
-
     let stepIndex = 0;
     const stepInterval = setInterval(() => {
       if (stepIndex < steps.length) {
@@ -357,7 +354,6 @@ const Home = () => {
         stepIndex++;
       }
     }, 3000);
-
     try {
       const response = await axios.post(
         'http://127.0.0.1:8000/api/analyze/resume/',
@@ -374,7 +370,6 @@ const Home = () => {
           }
         }
       );
-
       clearInterval(stepInterval);
       await processAnalysisResults(response.data);
     } catch (err) {
@@ -390,26 +385,20 @@ const Home = () => {
     if (data.error) {
       throw new Error(data.error);
     }
-
     setAnalysisStep(data.current_step || 'Analysis complete!');
     setProgress(100);
     setAnalysisResults(data);
     toast.success('Resume analyzed successfully!');
-
-    // The dashboard cache is already updated by the backend after saving to MongoDB
-    // Just refresh the dashboard stats to show updated data
-    setTimeout(async () => {
-      try {
-        const statsResponse = await axios.get('http://127.0.0.1:8000/api/dashboard/stats/');
-        if (statsResponse.data.status === 'success') {
-          setDashboardStats(statsResponse.data.stats);
-          toast.success('Dashboard updated with your analysis results!');
-        }
-      } catch (err) {
-        console.warn('Failed to refresh dashboard stats:', err);
-      }
-    }, 1000);
-
+    if (data.analysis_id) {
+      toast.success('Analysis saved to history!', {
+        icon: '💾',
+        duration: 3000
+      });
+    }
+    toast.success('Dashboard updated with real-time analysis results!', {
+      icon: '📊',
+      duration: 2000
+    });
     if (data.detailed_extraction) {
       const extraction = data.detailed_extraction;
       const info = [
@@ -418,7 +407,6 @@ const Home = () => {
         `${extraction.sections_detected?.length || 0} resume sections detected`,
         data.extraction_info?.email_found ? '✓ Contact info found' : '⚠️ Add contact information'
       ].filter(Boolean);
-
       setTimeout(() => {
         toast.info(`Analysis summary: ${info.join(' • ')}`);
       }, 1000);
@@ -427,7 +415,6 @@ const Home = () => {
 
   const handleAnalysisError = (err) => {
     let errorMessage = 'Analysis failed. Please try again.';
-
     if (err.response?.status === 400) {
       errorMessage = err.response.data.error || 'Invalid file or data format';
     } else if (err.response?.status === 503) {
@@ -437,11 +424,9 @@ const Home = () => {
     } else {
       errorMessage = err.response?.data?.error || err.message || 'Unknown error occurred';
     }
-
     setError(errorMessage);
     toast.error(`Error: ${errorMessage}`);
     setProgress(0);
-
     if (err.response?.data?.debug_info) {
       console.error('Debug info:', err.response.data.debug_info);
     }
@@ -455,11 +440,42 @@ const Home = () => {
     }
   };
 
+  // Function to refresh and reset dashboard stats to zero state
+  const refreshDashboardToZero = async () => {
+    setDashboardStats(null);
+    setAnalysisResults(null);
+
+    // Re-fetch only internships for available count
+    try {
+      const internshipsResponse = await axios.get('http://127.0.0.1:8000/api/internships/');
+      if (internshipsResponse.data.status === 'success') {
+        setInternships(internshipsResponse.data.internships);
+      }
+
+      toast.success('Dashboard refreshed - all stats reset to zero', {
+        icon: '🔄',
+        duration: 2000
+      });
+    } catch (error) {
+      console.error('Error refreshing dashboard:', error);
+      toast.error('Failed to refresh dashboard');
+    }
+  };
+
   const resetAnalysis = () => {
     setAnalysisResults(null);
     setUploadedResume(null);
     setError('');
     setSelectedPreferences(['Web Development', 'Data Science']);
+
+    // Reset dashboard stats to force zero state
+    setDashboardStats(null);
+
+    // Show confirmation that stats have been reset
+    toast.info('Dashboard reset to zero state', {
+      icon: '🔄',
+      duration: 2000
+    });
   };
 
   const getStatusIcon = (status) => {
@@ -512,14 +528,12 @@ const Home = () => {
 
   const downloadAnalysis = () => {
     if (!analysisResults) return;
-
     const data = {
       profile: analysisResults.student_profile,
       recommendations: analysisResults.internship_recommendations,
       gaps: analysisResults.portfolio_gaps,
       timestamp: new Date().toISOString()
     };
-
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -558,10 +572,8 @@ const Home = () => {
           initial="hidden"
           animate="visible"
         >
-          <WelcomeSection user={user} navigate={navigate} />
-
+          <WelcomeSection user={user} navigate={navigate} refreshDashboardToZero={refreshDashboardToZero} />
           <StatsSection stats={dashboardStatsData} />
-
           <div className="grid lg:grid-cols-4 gap-8">
             <MainContent
               analysisResults={analysisResults}
@@ -593,7 +605,6 @@ const Home = () => {
               getStatusColor={getStatusColor}
               groupCommunicationsByAgent={groupCommunicationsByAgent}
             />
-
             <Sidebar
               analysisResults={analysisResults}
               recentActivity={activityData}
@@ -604,49 +615,11 @@ const Home = () => {
           </div>
         </motion.div>
       )}
-      {/* Custom Scrollbar Styles */}
-      <style jsx>{`
-        .overflow-x-auto::-webkit-scrollbar {
-          height: 8px;
-        }
-        .overflow-x-auto::-webkit-scrollbar-track {
-          background: rgba(31, 41, 55, 0.5);
-          border-radius: 4px;
-        }
-        .overflow-x-auto::-webkit-scrollbar-thumb {
-          background: linear-gradient(90deg, rgba(99, 102, 241, 0.7), rgba(147, 51, 234, 0.7));
-          border-radius: 4px;
-        }
-        .overflow-x-auto::-webkit-scrollbar-thumb:hover {
-          background: linear-gradient(90deg, rgba(99, 102, 241, 0.9), rgba(147, 51, 234, 0.9));
-        }
-        
-        /* Smooth scrolling */
-        .overflow-x-auto {
-          scroll-behavior: smooth;
-        }
-        
-        /* Enhanced animations */
-        @keyframes slideInRight {
-          from {
-            transform: translateX(100px);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-        
-        .animate-slide-in {
-          animation: slideInRight 0.6s ease-out forwards;
-        }
-      `}</style>
     </div>
   );
 };
 
-const WelcomeSection = ({ user, navigate }) => (
+const WelcomeSection = ({ user, navigate, refreshDashboardToZero }) => (
   <motion.div variants={itemVariants} className="mb-8">
     <div className="flex items-center justify-between">
       <div>
@@ -666,6 +639,16 @@ const WelcomeSection = ({ user, navigate }) => (
         >
           <Clock className="w-4 h-4 mr-2" />
           View History
+        </motion.button>
+        <motion.button
+          onClick={refreshDashboardToZero}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          className="flex items-center px-4 py-2 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-lg hover:from-gray-700 hover:to-gray-800 transition-all shadow-lg hover:shadow-gray-500/25"
+          title="Reset dashboard to zero state"
+        >
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Reset Stats
         </motion.button>
       </div>
     </div>
@@ -766,6 +749,7 @@ const MainContent = ({
           getStatusIcon={getStatusIcon}
           getStatusColor={getStatusColor}
           groupCommunicationsByAgent={groupCommunicationsByAgent}
+          navigate={navigate}
         />
       )}
     </div>
@@ -801,15 +785,12 @@ const UploadSection = ({
             Upload your resume and select preferred domains for personalized internship matching.
           </p>
         </div>
-
         <div className="space-y-6">
           <DomainPreferences
             selectedPreferences={selectedPreferences}
             availableDomains={availableDomains}
             handlePreferenceToggle={handlePreferenceToggle}
           />
-
-          {/* GitHub Profile Input */}
           <div className="space-y-2">
             <label htmlFor="github-input" className="block text-sm font-medium text-gray-300">
               GitHub Profile (Optional)
@@ -832,7 +813,6 @@ const UploadSection = ({
               Add your GitHub profile to enhance portfolio analysis and get better recommendations
             </p>
           </div>
-
           <motion.label
             whileHover={{ scale: 1.02 }}
             className="border-2 border-dashed border-gray-700 rounded-lg p-6 text-center hover:border-blue-500 transition-all duration-300 block cursor-pointer group"
@@ -863,11 +843,9 @@ const UploadSection = ({
               </p>
             </div>
           </motion.label>
-
           {error && (
             <ErrorDisplay error={error} retryAnalysis={retryAnalysis} />
           )}
-
           {isAnalyzing && (
             <ProgressDisplay analysisStep={analysisStep} progress={progress} />
           )}
@@ -899,7 +877,6 @@ const DomainPreferences = ({ selectedPreferences, availableDomains, handlePrefer
     <p className="text-xs text-gray-500 mt-2">
       Select multiple domains to get diverse internship recommendations
     </p>
-
     {selectedPreferences.length > 0 && (
       <div className="mt-4">
         <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -974,7 +951,8 @@ const ResultsSection = ({
   resetAnalysis,
   getStatusIcon,
   getStatusColor,
-  groupCommunicationsByAgent
+  groupCommunicationsByAgent,
+  navigate
 }) => {
   return (
     <>
@@ -984,8 +962,8 @@ const ResultsSection = ({
         setShowAgentComm={setShowAgentComm}
         downloadAnalysis={downloadAnalysis}
         resetAnalysis={resetAnalysis}
+        navigate={navigate}
       />
-
       <AgentCommunications
         analysisResults={analysisResults}
         showAgentComm={showAgentComm}
@@ -995,7 +973,6 @@ const ResultsSection = ({
         getStatusColor={getStatusColor}
         groupCommunicationsByAgent={groupCommunicationsByAgent}
       />
-
       <ResumeTextExtraction
         analysisResults={analysisResults}
         showFullText={showFullText}
@@ -1003,21 +980,16 @@ const ResultsSection = ({
         setShowFullText={setShowFullText}
         copyToClipboard={copyToClipboard}
       />
-
       <ProfileSummary analysisResults={analysisResults} />
-
       <InternshipRecommendations analysisResults={analysisResults} />
-
       <PortfolioGaps analysisResults={analysisResults} />
-
       <ExtractionDetails analysisResults={analysisResults} />
-
       <GitHubAnalysis profile={analysisResults.student_profile} />
     </>
   );
 };
 
-const AnalysisCompleteBanner = ({ analysisResults, showAgentComm, setShowAgentComm, downloadAnalysis, resetAnalysis }) => (
+const AnalysisCompleteBanner = ({ analysisResults, showAgentComm, setShowAgentComm, downloadAnalysis, resetAnalysis, navigate }) => (
   <motion.div
     initial={{ scale: 0.9 }}
     animate={{ scale: 1 }}
@@ -1047,6 +1019,15 @@ const AnalysisCompleteBanner = ({ analysisResults, showAgentComm, setShowAgentCo
         >
           {showAgentComm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           {showAgentComm ? 'Hide' : 'View'} AI Logs
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => navigate('/analysis-history')}
+          className="px-4 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-300 rounded-lg text-sm flex items-center gap-2 transition-all"
+        >
+          <Clock className="w-4 h-4" />
+          View in History
         </motion.button>
         <motion.button
           whileHover={{ scale: 1.05 }}
@@ -1095,7 +1076,6 @@ const AgentCommunications = ({
               {Object.keys(groupCommunicationsByAgent(analysisResults.agent_communications)).length} Agents
             </span>
           </h3>
-
           <div className="space-y-4">
             {Object.entries(groupCommunicationsByAgent(analysisResults.agent_communications)).map(([agentName, communications]) => (
               <AgentCommunicationItem
@@ -1166,7 +1146,6 @@ const AgentCommunicationItem = ({
           <ChevronDown className="w-5 h-5 text-gray-400" />
         </motion.div>
       </motion.button>
-
       <AnimatePresence>
         {expandedAgent === agentName && (
           <motion.div
@@ -1212,7 +1191,6 @@ const CommunicationStep = ({ comm, idx, getStatusIcon, getStatusColor }) => (
         {comm.status}
       </span>
     </div>
-
     {comm.micro_goal && (
       <motion.div
         initial={{ opacity: 0 }}
@@ -1223,7 +1201,6 @@ const CommunicationStep = ({ comm, idx, getStatusIcon, getStatusColor }) => (
         <span className="ml-2 text-gray-200">{comm.micro_goal}</span>
       </motion.div>
     )}
-
     {comm.data && Object.keys(comm.data).length > 0 && (
       <motion.div
         initial={{ opacity: 0 }}
@@ -1287,11 +1264,9 @@ const ResumeTextExtraction = ({
           </motion.button>
         </div>
       </div>
-
       {analysisResults.detailed_extraction && (
         <DocumentStatistics extraction={analysisResults.detailed_extraction} />
       )}
-
       <ExtractedTextDisplay
         analysisResults={analysisResults}
         showFullText={showFullText}
@@ -1323,7 +1298,6 @@ const DocumentStatistics = ({ extraction }) => (
         </div>
       </div>
     </motion.div>
-
     <motion.div
       whileHover={{ scale: 1.02 }}
       className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50"
@@ -1344,7 +1318,6 @@ const DocumentStatistics = ({ extraction }) => (
         </div>
       </div>
     </motion.div>
-
     <motion.div
       whileHover={{ scale: 1.02 }}
       className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50"
@@ -1356,7 +1329,6 @@ const DocumentStatistics = ({ extraction }) => (
         <div className="text-green-400">✓ Structure Analyzed</div>
       </div>
     </motion.div>
-
     <motion.div
       whileHover={{ scale: 1.02 }}
       className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50"
@@ -1392,7 +1364,6 @@ const ExtractedTextDisplay = ({ analysisResults, showFullText, setShowFullText }
         Processed by Gemini AI
       </span>
     </div>
-
     <div className={`p-4 bg-gray-900/50 text-sm text-gray-300 whitespace-pre-wrap font-mono leading-relaxed ${showFullText ? 'max-h-none' : 'max-h-64'
       } overflow-y-auto transition-all duration-300`}>
       {analysisResults.file_info?.resume_text ? (
@@ -1413,7 +1384,6 @@ const ExtractedTextDisplay = ({ analysisResults, showFullText, setShowFullText }
         </div>
       )}
     </div>
-
     {!showFullText && analysisResults.file_info?.resume_text?.length > 1000 && (
       <div className="p-3 bg-gray-800/30 border-t border-gray-700/50 text-center">
         <motion.button
@@ -1431,7 +1401,6 @@ const ExtractedTextDisplay = ({ analysisResults, showFullText, setShowFullText }
 const ProfileSummary = ({ analysisResults }) => {
   const profile = analysisResults.student_profile || {};
   const extraction = analysisResults.detailed_extraction || {};
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -1446,7 +1415,6 @@ const ProfileSummary = ({ analysisResults }) => {
           {Math.round(((profile.skills?.length || 0) / 25) * 100)}% Complete
         </span>
       </h3>
-
       <div className="grid md:grid-cols-2 gap-6">
         <div className="space-y-4">
           <PersonalInformation profile={profile} />
@@ -1454,7 +1422,6 @@ const ProfileSummary = ({ analysisResults }) => {
           {hasOnlineProfiles(profile) && <OnlineProfiles profile={profile} />}
           {profile.github_analysis && <GitHubAnalysis profile={profile} />}
         </div>
-
         <div className="space-y-4">
           <TechnicalSkills profile={profile} />
           {profile.education?.length > 0 && <Education profile={profile} />}
@@ -1574,7 +1541,6 @@ const TechnicalSkills = ({ profile }) => (
       <Code className="w-4 h-4 mr-2" />
       Technical Skills ({profile.skills?.length || 0} detected)
     </h4>
-
     <div className="space-y-3">
       {profile.programming_languages?.length > 0 && (
         <SkillCategory
@@ -1583,7 +1549,6 @@ const TechnicalSkills = ({ profile }) => (
           color="blue"
         />
       )}
-
       {profile.frameworks?.length > 0 && (
         <SkillCategory
           title="Frameworks"
@@ -1591,7 +1556,6 @@ const TechnicalSkills = ({ profile }) => (
           color="green"
         />
       )}
-
       {profile.tools?.length > 0 && (
         <SkillCategory
           title="Tools"
@@ -1599,14 +1563,14 @@ const TechnicalSkills = ({ profile }) => (
           color="purple"
         />
       )}
-
       {profile.databases?.length > 0 && (
         <SkillCategory
           title="Databases"
           items={profile.databases}
           color="orange"
         />
-      )}      {(!profile.programming_languages?.length &&
+      )}
+      {(!profile.programming_languages?.length &&
         !profile.frameworks?.length &&
         !profile.tools?.length &&
         !profile.databases?.length) &&
@@ -1639,7 +1603,6 @@ const SkillCategory = ({ title, items, color }) => {
     purple: 'bg-purple-600/20 text-purple-300 hover:bg-purple-600/30',
     orange: 'bg-orange-600/20 text-orange-300 hover:bg-orange-600/30'
   };
-
   return (
     <div>
       <span className="text-xs text-gray-500 flex items-center mb-1">
@@ -1717,14 +1680,12 @@ const InternshipRecommendations = ({ analysisResults }) => {
   if (!analysisResults?.internship_recommendations?.length) {
     return null;
   }
-
   const recommendations = analysisResults.internship_recommendations;
   const averageMatch = Math.round(
     (recommendations.reduce((acc, rec) => acc + rec.matching_score, 0) / recommendations.length) * 100
   );
   const uniqueDomains = new Set(recommendations.map(rec => rec.domain)).size;
   const highMatchCount = recommendations.filter(rec => rec.matching_score >= 0.8).length;
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -1757,18 +1718,14 @@ const InternshipRecommendations = ({ analysisResults }) => {
           </motion.button>
         </div>
       </div>
-
-      {/* Horizontal Scrolling Container */}
       <div className="relative mb-6 overflow-hidden">
-        <motion.div 
+        <motion.div
           className="flex gap-6 pb-4"
-          style={{ 
+          style={{
             overflowX: 'auto',
             scrollbarWidth: 'thin',
             scrollbarColor: '#6366f1 #1f2937'
           }}
-          initial={{ x: -50 }}
-          animate={{ x: 0 }}
           transition={{ duration: 0.8 }}
         >
           {recommendations.map((rec, index) => (
@@ -1777,7 +1734,7 @@ const InternshipRecommendations = ({ analysisResults }) => {
               className="flex-shrink-0 w-80"
               initial={{ opacity: 0, x: 100 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ 
+              transition={{
                 delay: index * 0.1,
                 duration: 0.6,
                 type: "spring",
@@ -1788,19 +1745,14 @@ const InternshipRecommendations = ({ analysisResults }) => {
             </motion.div>
           ))}
         </motion.div>
-        
-        {/* Gradient Fade Effect */}
         <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-gray-900/50 to-transparent pointer-events-none" />
       </div>
-
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-gray-700/30">
         <StatCard value={recommendations.length} label="Total Matches" color="purple" />
         <StatCard value={`${averageMatch}%`} label="Avg Match" color="green" />
         <StatCard value={uniqueDomains} label="Domains" color="blue" />
         <StatCard value={highMatchCount} label="High Match" color="yellow" />
       </div>
-
-      {/* Custom Scrollbar Styles */}
       <style jsx>{`
         .overflow-x-auto::-webkit-scrollbar {
           height: 8px;
@@ -1810,19 +1762,15 @@ const InternshipRecommendations = ({ analysisResults }) => {
           border-radius: 4px;
         }
         .overflow-x-auto::-webkit-scrollbar-thumb {
-          background: linear-gradient(90deg, rgba(99, 102, 241,  0.7), rgba(147, 51, 234, 0.7));
+          background: linear-gradient(90deg, rgba(99, 102, 241, 0.7), rgba(147, 51, 234, 0.7));
           border-radius: 4px;
         }
         .overflow-x-auto::-webkit-scrollbar-thumb:hover {
           background: linear-gradient(90deg, rgba(99, 102, 241, 0.9), rgba(147, 51, 234, 0.9));
         }
-        
-        /* Smooth scrolling */
         .overflow-x-auto {
           scroll-behavior: smooth;
         }
-        
-        /* Enhanced animations */
         @keyframes slideInRight {
           from {
             transform: translateX(100px);
@@ -1833,7 +1781,6 @@ const InternshipRecommendations = ({ analysisResults }) => {
             opacity: 1;
           }
         }
-        
         .animate-slide-in {
           animation: slideInRight 0.6s ease-out forwards;
         }
@@ -1842,20 +1789,16 @@ const InternshipRecommendations = ({ analysisResults }) => {
   );
 };
 
-// Enhanced Internship Card with Better Design and Animations
 const InternshipCard = ({ rec, index }) => {
   const [isLiked, setIsLiked] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
-
   const matchColor = rec.matching_score >= 0.8 ? 'from-emerald-500 to-green-600' :
     rec.matching_score >= 0.6 ? 'from-yellow-500 to-orange-500' :
       'from-red-500 to-pink-600';
-
   const matchText = rec.matching_score >= 0.8 ? 'Excellent Match' :
     rec.matching_score >= 0.6 ? 'Good Match' :
       'Partial Match';
-
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9, rotateY: 45 }}
@@ -1874,9 +1817,7 @@ const InternshipCard = ({ rec, index }) => {
       }}
       className="group relative bg-gradient-to-br from-gray-900/80 via-gray-800/60 to-gray-900/80 backdrop-blur-xl rounded-2xl overflow-hidden border border-gray-700/50 hover:border-purple-500/50 transition-all duration-500 h-fit"
     >
-      {/* Background Gradient Animation */}
-      <motion.div
-        className="absolute inset-0 bg-gradient-to-br from-purple-600/5 via-blue-600/5 to-cyan-600/5"
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-600/5 via-blue-600/5 to-cyan-600/5"
         animate={{
           background: [
             "linear-gradient(45deg, rgba(147, 51, 234, 0.05), rgba(59, 130, 246, 0.05), rgba(6, 182, 212, 0.05))",
@@ -1886,8 +1827,6 @@ const InternshipCard = ({ rec, index }) => {
         }}
         transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
       />
-
-      {/* Header Section */}
       <div className="relative p-6 pb-4">
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1 min-w-0">
@@ -1939,8 +1878,6 @@ const InternshipCard = ({ rec, index }) => {
           </div>
         </div>
       </div>
-
-      {/* Body Section */}
       <div className="p-6 pt-0">
         <div className="space-y-4 mb-4">
           <div className="flex items-center justify-between text-sm">
@@ -1956,7 +1893,6 @@ const InternshipCard = ({ rec, index }) => {
             <span className="text-gray-300">{rec.stipend || 'Unpaid'}</span>
           </div>
         </div>
-
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
@@ -1967,22 +1903,18 @@ const InternshipCard = ({ rec, index }) => {
           <ChevronDown className={`w-4 h-4 transition-transform ${showFullDescription ? 'rotate-180' : ''}`} />
         </motion.button>
       </div>
-
-      {/* Description Section */}
       {showFullDescription && (
         <div className="p-6 pt-0 bg-gray-800/30 rounded-b-lg border-t border-gray-700/50">
           <h4 className="text-sm font-medium text-gray-400 mb-3">Job Description</h4>
           <p className="text-sm text-gray-300 leading-relaxed mb-4">
             {rec.justification || 'No description provided.'}
           </p>
-
           <div className="space-y-2">
             <SkillList title="Required Skills" skills={rec.requirements} color="emerald" maxVisible={3} />
             {rec.preferred_skills?.length > 0 && (
               <SkillList title="Preferred Skills" skills={rec.preferred_skills} color="blue" maxVisible={2} />
             )}
           </div>
-
           <div className="mt-4 flex gap-2">
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -2015,12 +1947,10 @@ const InternshipCard = ({ rec, index }) => {
 
 const SkillList = ({ title, skills, color, maxVisible }) => {
   if (!skills?.length) return null;
-
   const colorClasses = {
     emerald: 'bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30',
     blue: 'bg-blue-600/20 text-blue-300 hover:bg-blue-600/30'
   };
-
   return (
     <div>
       <span className="text-xs text-gray-500 font-medium mb-2 block">{title}:</span>
@@ -2054,7 +1984,6 @@ const StatCard = ({ value, label, color }) => {
     blue: 'bg-blue-600/10 border-blue-500/20 text-blue-400',
     yellow: 'bg-yellow-600/10 border-yellow-500/20 text-yellow-400'
   };
-
   return (
     <motion.div
       whileHover={{ scale: 1.02 }}
@@ -2072,7 +2001,6 @@ const PortfolioGaps = ({ analysisResults }) => {
   if (!analysisResults?.portfolio_gaps?.length) {
     return null;
   }
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -2099,7 +2027,6 @@ const PortfolioGapItem = ({ gap }) => {
     medium: 'bg-yellow-600/20 text-yellow-300',
     low: 'bg-green-600/20 text-green-300'
   };
-
   return (
     <div className="bg-gray-800/30 rounded-lg p-4">
       <div className="flex items-start justify-between mb-3">
@@ -2140,17 +2067,14 @@ const PortfolioGapItem = ({ gap }) => {
 
 const ExtractionDetails = ({ analysisResults }) => {
   if (!analysisResults) return null;
-
   const profile = analysisResults.student_profile || {};
   const extraction = analysisResults.detailed_extraction || {};
-
   return (
     <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-lg p-6">
       <h3 className="text-xl font-bold mb-4 flex items-center">
         <FileText className="w-5 h-5 mr-2 text-green-400" />
         Extraction Details
       </h3>
-
       {analysisResults.detailed_extraction && (
         <div className="grid md:grid-cols-3 gap-4 mb-4">
           <StatItem
@@ -2161,7 +2085,6 @@ const ExtractionDetails = ({ analysisResults }) => {
               { label: 'Paragraphs', value: extraction.paragraphs || 0 }
             ]}
           />
-
           <StatItem
             title="Contact Information"
             stats={[
@@ -2170,7 +2093,6 @@ const ExtractionDetails = ({ analysisResults }) => {
               { label: 'URLs', value: extraction.url_patterns_found || 0, icon: '🔗', hasValue: extraction.url_patterns_found > 0 }
             ]}
           />
-
           <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50">
             <p className="text-gray-400 text-xs mb-1">AI Processing</p>
             <div className="text-sm space-y-1">
@@ -2179,7 +2101,6 @@ const ExtractionDetails = ({ analysisResults }) => {
               <div className="text-green-400">✓ Structure Analyzed</div>
             </div>
           </div>
-
           <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50">
             <p className="text-gray-400 text-xs mb-1">Sections Found</p>
             <div className="text-xs">
@@ -2200,11 +2121,9 @@ const ExtractionDetails = ({ analysisResults }) => {
           </div>
         </div>
       )}
-
       <div className="grid md:grid-cols-2 gap-4">
         <InfoItem label="Name" value={profile.name || 'Not detected'} />
         <InfoItem label="Experience Level" value={profile.experience_level || 'Entry-level'} capitalize />
-
         <div>
           <p className="text-gray-400 text-sm">Contact Info</p>
           <div className="text-sm space-y-1">
@@ -2231,7 +2150,6 @@ const ExtractionDetails = ({ analysisResults }) => {
             )}
           </div>
         </div>
-
         <div>
           <p className="text-gray-400 text-sm">Skills ({profile.skills?.length || 0})</p>
           <div className="flex flex-wrap gap-1 mt-1">
@@ -2241,7 +2159,7 @@ const ExtractionDetails = ({ analysisResults }) => {
               </span>
             ))}
             {(profile.skills?.length || 0) > 6 && (
-              <span className="px-2 py-1 bg-gray-600/20 text-gray-300 text-xs rounded">
+              <span className="px-2 py-1 bg-gray-600/20 text-gray-400 text-xs rounded">
                 +{profile.skills.length - 6} more
               </span>
             )}
@@ -2284,13 +2202,10 @@ const Sidebar = ({ analysisResults, recentActivity, showAgentComm, setShowAgentC
   return (
     <div className="space-y-6">
       <ProgressCard recentActivity={recentActivity} analysisResults={analysisResults} />
-
       {analysisResults?.readiness_evaluations?.[0] && (
         <NextStepsCard readinessEvaluation={analysisResults.readiness_evaluations[0]} />
       )}
-
       <AIInsightsCard analysisResults={analysisResults} />
-
       <QuickActionsCard
         analysisResults={analysisResults}
         showAgentComm={showAgentComm}
@@ -2305,7 +2220,6 @@ const ProgressCard = ({ recentActivity, analysisResults }) => {
   const completedCount = recentActivity.filter(a => a.status === 'completed').length;
   const totalCount = recentActivity.length;
   const aiSteps = analysisResults?.agent_communications?.length || 0;
-
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -2326,7 +2240,6 @@ const ProgressCard = ({ recentActivity, analysisResults }) => {
             <ChevronDown className="w-4 h-4 text-gray-400" />
           </motion.div>
         </h3>
-
         <div className="mt-3 space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-400">Status:</span>
@@ -2345,7 +2258,6 @@ const ProgressCard = ({ recentActivity, analysisResults }) => {
           )}
         </div>
       </div>
-
       <AnimatePresence>
         <motion.div
           initial={{ height: 0, opacity: 0 }}
@@ -2377,7 +2289,6 @@ const ProgressCard = ({ recentActivity, analysisResults }) => {
                 </motion.div>
               ))}
             </div>
-
             {analysisResults?.detailed_extraction && (
               <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
                 <h4 className="text-sm font-semibold text-blue-300 mb-2">Summary</h4>
@@ -2387,7 +2298,6 @@ const ProgressCard = ({ recentActivity, analysisResults }) => {
                   <div>✓ {analysisResults.internship_recommendations?.length || 0} matches</div>
                   <div>✓ {analysisResults.detailed_extraction.sections_detected?.length || 0} sections</div>
                 </div>
-
                 {analysisResults.agent_communications && (
                   <div className="mt-2 pt-2 border-t border-blue-500/20">
                     <div className="text-xs text-blue-200">
@@ -2411,11 +2321,8 @@ const NextStepsCard = ({ readinessEvaluation }) => {
   const steps = readinessEvaluation.next_steps || [];
   const timeline = readinessEvaluation.timeline;
   const [expandedStep, setExpandedStep] = useState(null);
-
-  // Handle both old format (array of strings) and new format (array of objects)
   const processedSteps = Array.isArray(steps) ? steps.map((step, index) => {
     if (typeof step === 'string') {
-      // Convert old format to new format
       return {
         category: 'General',
         priority: 'Medium',
@@ -2429,7 +2336,6 @@ const NextStepsCard = ({ readinessEvaluation }) => {
     }
     return step;
   }) : [];
-
   const getPriorityColor = (priority) => {
     switch (priority?.toLowerCase()) {
       case 'high': return 'text-red-400 bg-red-500/20 border-red-500/30';
@@ -2438,7 +2344,6 @@ const NextStepsCard = ({ readinessEvaluation }) => {
       default: return 'text-blue-400 bg-blue-500/20 border-blue-500/30';
     }
   };
-
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -2456,7 +2361,6 @@ const NextStepsCard = ({ readinessEvaluation }) => {
             {processedSteps.length} action items
           </span>
         </h3>
-
         <div className="space-y-3">
           {processedSteps.map((step, index) => (
             <motion.div
@@ -2466,7 +2370,6 @@ const NextStepsCard = ({ readinessEvaluation }) => {
               transition={{ delay: index * 0.1 }}
               className="border border-gray-700/50 rounded-lg overflow-hidden hover:border-gray-600/50 transition-all duration-200"
             >
-              {/* Step Header */}
               <div
                 className="p-3 cursor-pointer hover:bg-gray-800/30 transition-colors"
                 onClick={() => setExpandedStep(expandedStep === index ? null : index)}
@@ -2495,8 +2398,6 @@ const NextStepsCard = ({ readinessEvaluation }) => {
                   </motion.div>
                 </div>
               </div>
-
-              {/* Expanded Content */}
               <AnimatePresence>
                 {expandedStep === index && (
                   <motion.div
@@ -2507,7 +2408,6 @@ const NextStepsCard = ({ readinessEvaluation }) => {
                     className="overflow-hidden border-t border-gray-700/50"
                   >
                     <div className="p-4 bg-gray-800/20 space-y-4">
-                      {/* Goal Section */}
                       <div>
                         <h5 className="flex items-center text-sm font-medium text-green-400 mb-2">
                           <Award className="w-4 h-4 mr-1" />
@@ -2517,8 +2417,6 @@ const NextStepsCard = ({ readinessEvaluation }) => {
                           {step.goal}
                         </p>
                       </div>
-
-                      {/* Timeline */}
                       <div>
                         <h5 className="flex items-center text-sm font-medium text-blue-400 mb-2">
                           <Clock className="w-4 h-4 mr-1" />
@@ -2528,8 +2426,6 @@ const NextStepsCard = ({ readinessEvaluation }) => {
                           {step.timeline}
                         </span>
                       </div>
-
-                      {/* Resources */}
                       {step.resources && step.resources.length > 0 && (
                         <div>
                           <h5 className="flex items-center text-sm font-medium text-purple-400 mb-2">
@@ -2546,8 +2442,6 @@ const NextStepsCard = ({ readinessEvaluation }) => {
                           </div>
                         </div>
                       )}
-
-                      {/* Success Metrics */}
                       {step.success_metrics && step.success_metrics.length > 0 && (
                         <div>
                           <h5 className="flex items-center text-sm font-medium text-orange-400 mb-2">
@@ -2564,8 +2458,6 @@ const NextStepsCard = ({ readinessEvaluation }) => {
                           </div>
                         </div>
                       )}
-
-                      {/* Special sections for specific step types */}
                       {step.project_ideas && (
                         <div>
                           <h5 className="flex items-center text-sm font-medium text-cyan-400 mb-2">
@@ -2582,7 +2474,6 @@ const NextStepsCard = ({ readinessEvaluation }) => {
                           </div>
                         </div>
                       )}
-
                       {step.github_checklist && (
                         <div>
                           <h5 className="flex items-center text-sm font-medium text-gray-400 mb-2">
@@ -2599,7 +2490,6 @@ const NextStepsCard = ({ readinessEvaluation }) => {
                           </div>
                         </div>
                       )}
-
                       {step.learning_resources && (
                         <div>
                           <h5 className="flex items-center text-sm font-medium text-indigo-400 mb-2">
@@ -2623,8 +2513,6 @@ const NextStepsCard = ({ readinessEvaluation }) => {
             </motion.div>
           ))}
         </div>
-
-        {/* Overall Timeline */}
         <div className="mt-4 p-3 bg-gradient-to-r from-green-900/20 to-blue-900/20 border border-green-500/30 rounded-lg">
           <div className="flex items-start">
             <Clock className="w-4 h-4 text-green-400 mr-2 mt-0.5 flex-shrink-0" />
@@ -2667,7 +2555,6 @@ const AIInsightsCard = ({ analysisResults }) => {
       </motion.div>
     );
   }
-
   const skills = analysisResults.student_profile?.skills || [];
   const recommendations = analysisResults.internship_recommendations || [];
   const averageMatch = Math.round(
@@ -2675,7 +2562,6 @@ const AIInsightsCard = ({ analysisResults }) => {
   );
   const gaps = analysisResults.portfolio_gaps || [];
   const focusArea = gaps.length > 0 ? gaps[0].title || 'Portfolio Enhancement' : 'Ready to apply!';
-
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -2687,7 +2573,6 @@ const AIInsightsCard = ({ analysisResults }) => {
         <Brain className="w-5 h-5 mr-2 text-purple-400" />
         AI Insights
       </h3>
-
       <div className="space-y-4">
         <div className="bg-purple-800/20 rounded-lg p-3 border border-purple-500/20">
           <h4 className="text-sm font-medium text-purple-300 mb-2">Top Skills</h4>
@@ -2704,7 +2589,6 @@ const AIInsightsCard = ({ analysisResults }) => {
             )}
           </div>
         </div>
-
         <div className="bg-blue-800/20 rounded-lg p-3 border border-blue-500/20">
           <h4 className="text-sm font-medium text-blue-300 mb-2">Match Quality</h4>
           <div className="flex items-center justify-between">
@@ -2714,7 +2598,6 @@ const AIInsightsCard = ({ analysisResults }) => {
             </span>
           </div>
         </div>
-
         <div className="bg-orange-800/20 rounded-lg p-3 border border-orange-500/20">
           <h4 className="text-sm font-medium text-orange-300 mb-2">Focus Area</h4>
           <div className="text-sm text-orange-200">
@@ -2738,7 +2621,6 @@ const QuickActionsCard = ({ analysisResults, showAgentComm, setShowAgentComm, se
         <Zap className="w-5 h-5 mr-2 text-yellow-400" />
         Actions
       </h3>
-
       <div className="space-y-3">
         <motion.button
           whileHover={{ scale: 1.02, x: 3 }}
@@ -2752,7 +2634,6 @@ const QuickActionsCard = ({ analysisResults, showAgentComm, setShowAgentComm, se
           </div>
           <ChevronDown className="w-4 h-4 text-gray-400 rotate-[-90deg]" />
         </motion.button>
-
         {analysisResults && (
           <>
             <motion.button
@@ -2765,7 +2646,6 @@ const QuickActionsCard = ({ analysisResults, showAgentComm, setShowAgentComm, se
                   gaps: analysisResults.portfolio_gaps,
                   timestamp: new Date().toISOString()
                 };
-
                 const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -2785,7 +2665,6 @@ const QuickActionsCard = ({ analysisResults, showAgentComm, setShowAgentComm, se
               </div>
               <ChevronDown className="w-4 h-4 text-gray-400 rotate-[-90deg]" />
             </motion.button>
-
             <motion.button
               whileHover={{ scale: 1.02, x: 3 }}
               whileTap={{ scale: 0.98 }}
@@ -2810,9 +2689,7 @@ const QuickActionsCard = ({ analysisResults, showAgentComm, setShowAgentComm, se
 
 const GitHubAnalysis = ({ profile }) => {
   const githubData = profile.github_analysis;
-
   if (!githubData) return null;
-
   return (
     <motion.div
       whileHover={{ scale: 1.01 }}
@@ -2825,7 +2702,6 @@ const GitHubAnalysis = ({ profile }) => {
           Score: {githubData.github_score}/100
         </span>
       </h4>
-
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div className="bg-gray-900/30 rounded p-3">
           <div className="text-lg font-bold text-blue-400">{githubData.public_repos}</div>
@@ -2844,7 +2720,6 @@ const GitHubAnalysis = ({ profile }) => {
           <div className="text-xs text-gray-400">Total Forks</div>
         </div>
       </div>
-
       {githubData.top_languages && githubData.top_languages.length > 0 && (
         <div className="mb-3">
           <div className="text-xs text-gray-400 mb-1">Top Languages:</div>
@@ -2857,7 +2732,6 @@ const GitHubAnalysis = ({ profile }) => {
           </div>
         </div>
       )}
-
       {githubData.project_types && githubData.project_types.length > 0 && (
         <div>
           <div className="text-xs text-gray-400 mb-1">Project Types:</div>
@@ -2870,7 +2744,6 @@ const GitHubAnalysis = ({ profile }) => {
           </div>
         </div>
       )}
-
       <div className="mt-3 flex items-center text-xs">
         <a
           href={`https://github.com/${githubData.username}`}

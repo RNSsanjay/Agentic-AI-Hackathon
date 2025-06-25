@@ -491,33 +491,14 @@ def get_dashboard_stats(request):
             total_internships = 50  # Default fallback
             internships = []
         
-        # Check for real analysis data from MongoDB first
+        # Prioritize real-time analysis cache over database for home page stats
         user_id = request.GET.get('user_id')
-        mongodb_stats = None
         
-        if MONGODB_AVAILABLE and mongodb_service:
-            try:
-                if not mongodb_service.is_connected():
-                    mongodb_service.connect()
-                
-                if mongodb_service.is_connected():
-                    mongodb_stats = mongodb_service.get_analysis_statistics(user_id)
-            except Exception as e:
-                print(f"MongoDB stats fetch failed: {str(e)}")
-        
-        # Determine stats source and values
-        if mongodb_stats and mongodb_stats.get('total_analyses', 0) > 0:
-            # Use MongoDB data if available
-            readiness_score = mongodb_stats.get('avg_readiness_score', 0)
-            internship_match_count = mongodb_stats.get('total_internships_matched', 0)
-            gaps_detected = mongodb_stats.get('total_gaps_detected', 0)
-            using_real_data = True
-            last_analysis = mongodb_stats.get('last_analysis_date')
-            
-        elif (latest_analysis_cache.get('readiness_score') is not None and 
+        # Determine stats source and values - PRIORITIZE CACHE (real-time analysis) FIRST
+        if (latest_analysis_cache.get('readiness_score') is not None and 
               latest_analysis_cache.get('internship_matches') is not None and 
               latest_analysis_cache.get('gaps_detected') is not None):
-            # Use cached analysis results
+            # Use real-time cached analysis results (PRIORITY #1)
             readiness_score = latest_analysis_cache['readiness_score']
             internship_match_count = latest_analysis_cache['internship_matches']
             gaps_detected = latest_analysis_cache['gaps_detected']
@@ -525,7 +506,7 @@ def get_dashboard_stats(request):
             last_analysis = latest_analysis_cache.get('last_updated')
             
         else:
-            # Start with zero stats until analysis is performed
+            # Start with zero stats until analysis is performed (NO DATABASE FALLBACK)
             readiness_score = 0
             internship_match_count = 0
             gaps_detected = 0
