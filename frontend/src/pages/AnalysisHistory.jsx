@@ -106,21 +106,19 @@ const AnalysisHistory = () => {
         const linkElement = document.createElement('a');
         linkElement.setAttribute('href', dataUri);
         linkElement.setAttribute('download', exportFileDefaultName);
-        linkElement.click();
-
-        toast.success('Analysis exported successfully');
+        linkElement.click(); toast.success('Analysis exported successfully');
     };
 
     const getScoreColor = (score) => {
-        if (score >= 80) return 'text-green-400';
-        if (score >= 60) return 'text-yellow-400';
-        return 'text-red-400';
+        if (score >= 80) return 'text-green-600';
+        if (score >= 60) return 'text-amber-600';
+        return 'text-red-600';
     };
 
     const getScoreBadgeColor = (score) => {
-        if (score >= 80) return 'bg-green-900/30 text-green-400 border-green-500/30';
-        if (score >= 60) return 'bg-yellow-900/30 text-yellow-400 border-yellow-500/30';
-        return 'bg-red-900/30 text-red-400 border-red-500/30';
+        if (score >= 80) return 'bg-green-100 text-green-700 border-green-300';
+        if (score >= 60) return 'bg-amber-100 text-amber-700 border-amber-300';
+        return 'bg-red-100 text-red-700 border-red-300';
     };
 
     const filteredAnalyses = analyses.filter(analysis => {
@@ -131,45 +129,66 @@ const AnalysisHistory = () => {
         return true;
     });
 
-    const totalPages = Math.ceil(filteredAnalyses.length / analysesPerPage);
+    const totalPages = Math.ceil(filteredAnalyses.length / analysesPerPage); return (
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 relative overflow-hidden">
+            {/* Floating animated elements */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                <motion.div
+                    animate={{
+                        x: [0, 100, 0],
+                        y: [0, -100, 0],
+                        rotate: [0, 180, 360]
+                    }}
+                    transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                    className="absolute top-20 left-20 w-16 h-16 bg-blue-200/20 rounded-full"
+                />
+                <motion.div
+                    animate={{
+                        x: [0, -80, 0],
+                        y: [0, 120, 0],
+                        scale: [1, 1.2, 1]
+                    }}
+                    transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+                    className="absolute top-40 right-32 w-24 h-24 bg-blue-300/15 rounded-lg"
+                />
+            </div>
 
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
-            <div className="container mx-auto px-4 py-8">
+            <div className="container mx-auto px-4 py-8 relative z-10">
                 {/* Header */}
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="mb-8"
-                >
-                    <div className="flex items-center justify-between mb-6">
+                >                    <div className="flex items-center justify-between mb-6">
                         <div>
-                            <h1 className="text-4xl font-bold text-white mb-2">Analysis History</h1>
-                            <p className="text-gray-400">Track your resume analysis journey and improvements</p>
+                            <h1 className="text-4xl font-bold text-gray-800 mb-2 bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+                                Analysis History
+                            </h1>
+                            <p className="text-gray-600 font-medium">Track your resume analysis journey and improvements</p>
                         </div>
-                        <button
+                        <motion.button
                             onClick={() => window.history.back()}
-                            className="flex items-center px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                            whileHover={{ scale: 1.05, y: -2 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="flex items-center px-6 py-3 bg-white/80 backdrop-blur-sm text-blue-600 border border-blue-200 rounded-xl hover:bg-white hover:shadow-lg transition-all font-medium"
                         >
                             <ChevronLeft className="w-4 h-4 mr-2" />
                             Back
-                        </button>
-                    </div>
-
-                    {/* Statistics Cards */}
+                        </motion.button>
+                    </div>                    {/* Statistics Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                         <motion.div
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
                             transition={{ delay: 0.1 }}
-                            className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-6"
+                            className="bg-white/80 backdrop-blur-sm border border-blue-200 rounded-2xl p-6 hover:bg-white hover:shadow-xl transition-all duration-300"
                         >
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-gray-400 text-sm">Total Analyses</p>
-                                    <p className="text-2xl font-bold text-white">{statistics.total_analyses || 0}</p>
+                                    <p className="text-gray-600 text-sm font-semibold uppercase tracking-wider">Total Analyses</p>
+                                    <p className="text-3xl font-bold text-gray-800">{statistics.total_analyses || 0}</p>
                                 </div>
-                                <BarChart3 className="w-8 h-8 text-blue-400" />
+                                <BarChart3 className="w-8 h-8 text-blue-600" />
                             </div>
                         </motion.div>
 
@@ -177,16 +196,16 @@ const AnalysisHistory = () => {
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
                             transition={{ delay: 0.2 }}
-                            className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-6"
+                            className="bg-white/80 backdrop-blur-sm border border-blue-200 rounded-2xl p-6 hover:bg-white hover:shadow-xl transition-all duration-300"
                         >
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-gray-400 text-sm">Avg. Readiness Score</p>
-                                    <p className={`text-2xl font-bold ${getScoreColor(statistics.avg_readiness_score || 0)}`}>
+                                    <p className="text-gray-600 text-sm font-semibold uppercase tracking-wider">Avg. Readiness Score</p>
+                                    <p className={`text-3xl font-bold ${getScoreColor(statistics.avg_readiness_score || 0)}`}>
                                         {statistics.avg_readiness_score || 0}%
                                     </p>
                                 </div>
-                                <TrendingUp className="w-8 h-8 text-green-400" />
+                                <TrendingUp className="w-8 h-8 text-green-600" />
                             </div>
                         </motion.div>
 
@@ -194,14 +213,14 @@ const AnalysisHistory = () => {
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
                             transition={{ delay: 0.3 }}
-                            className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-6"
+                            className="bg-white/80 backdrop-blur-sm border border-blue-200 rounded-2xl p-6 hover:bg-white hover:shadow-xl transition-all duration-300"
                         >
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-gray-400 text-sm">Total Internships Matched</p>
-                                    <p className="text-2xl font-bold text-white">{statistics.total_internships_matched || 0}</p>
+                                    <p className="text-gray-600 text-sm font-semibold uppercase tracking-wider">Total Internships Matched</p>
+                                    <p className="text-3xl font-bold text-gray-800">{statistics.total_internships_matched || 0}</p>
                                 </div>
-                                <Target className="w-8 h-8 text-purple-400" />
+                                <Target className="w-8 h-8 text-purple-600" />
                             </div>
                         </motion.div>
 
@@ -209,70 +228,70 @@ const AnalysisHistory = () => {
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
                             transition={{ delay: 0.4 }}
-                            className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-6"
+                            className="bg-white/80 backdrop-blur-sm border border-blue-200 rounded-2xl p-6 hover:bg-white hover:shadow-xl transition-all duration-300"
                         >
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-gray-400 text-sm">GitHub Analyses</p>
-                                    <p className="text-2xl font-bold text-white">{statistics.has_github_analyses || 0}</p>
+                                    <p className="text-gray-600 text-sm font-semibold uppercase tracking-wider">GitHub Analyses</p>
+                                    <p className="text-3xl font-bold text-gray-800">{statistics.has_github_analyses || 0}</p>
                                 </div>
-                                <Github className="w-8 h-8 text-orange-400" />
+                                <Github className="w-8 h-8 text-orange-600" />
                             </div>
                         </motion.div>
                     </div>
-                </motion.div>
-
-                {/* Search and Filter */}
+                </motion.div>                {/* Search and Filter */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
-                    className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-6 mb-8"
+                    className="bg-white/80 backdrop-blur-sm border border-blue-200 rounded-2xl p-6 mb-8 shadow-lg"
                 >
                     <div className="flex flex-col md:flex-row gap-4">
                         <div className="flex-1 relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-5 h-5" />
                             <input
                                 type="text"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 placeholder="Search by student name, skills, or summary..."
-                                className="w-full pl-10 pr-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full pl-10 pr-4 py-3 bg-white/80 border border-gray-300 rounded-xl text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
                             />
                         </div>
 
-                        <div className="flex gap-2">
-                            <button
+                        <div className="flex gap-3">
+                            <motion.button
                                 onClick={() => setShowFilters(!showFilters)}
-                                className={`flex items-center px-4 py-3 rounded-lg border transition-colors ${showFilters
-                                        ? 'bg-blue-600 border-blue-500 text-white'
-                                        : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'
+                                whileHover={{ scale: 1.02, y: -1 }}
+                                whileTap={{ scale: 0.98 }}
+                                className={`flex items-center px-6 py-3 rounded-xl border-2 transition-all font-medium ${showFilters
+                                    ? 'bg-blue-600 border-blue-600 text-white shadow-lg'
+                                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
                                     }`}
                             >
                                 <Filter className="w-4 h-4 mr-2" />
                                 Filters
-                            </button>
+                            </motion.button>
 
-                            <button
+                            <motion.button
                                 onClick={fetchAnalysisHistory}
-                                className="flex items-center px-4 py-3 bg-gray-800 border border-gray-700 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors"
+                                whileHover={{ scale: 1.02, y: -1 }}
+                                whileTap={{ scale: 0.98 }}
+                                className="flex items-center px-6 py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium"
                             >
                                 <RefreshCw className="w-4 h-4 mr-2" />
                                 Refresh
-                            </button>
+                            </motion.button>
                         </div>
-                    </div>
-
-                    {/* Filter Options */}
+                    </div>                    {/* Filter Options */}
                     <AnimatePresence>
                         {showFilters && (
                             <motion.div
                                 initial={{ opacity: 0, height: 0 }}
                                 animate={{ opacity: 1, height: 'auto' }}
                                 exit={{ opacity: 0, height: 0 }}
-                                className="mt-4 pt-4 border-t border-gray-700"
+                                className="mt-6 pt-6 border-t border-gray-200"
                             >
-                                <div className="flex flex-wrap gap-2">
+                                <div className="flex flex-wrap gap-3">
                                     {[
                                         { value: 'all', label: 'All Analyses', icon: BarChart3 },
                                         { value: 'high-score', label: 'High Score (80%+)', icon: Star },
@@ -282,17 +301,19 @@ const AnalysisHistory = () => {
                                     ].map((filter) => {
                                         const IconComponent = filter.icon;
                                         return (
-                                            <button
+                                            <motion.button
                                                 key={filter.value}
                                                 onClick={() => setFilterType(filter.value)}
-                                                className={`flex items-center px-3 py-2 rounded-lg text-sm transition-colors ${filterType === filter.value
-                                                        ? 'bg-blue-600 text-white'
-                                                        : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                                                whileHover={{ scale: 1.02, y: -1 }}
+                                                whileTap={{ scale: 0.98 }}
+                                                className={`flex items-center px-4 py-2 rounded-xl text-sm transition-all font-medium border-2 ${filterType === filter.value
+                                                    ? 'bg-blue-600 text-white border-blue-600 shadow-lg'
+                                                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:border-gray-300'
                                                     }`}
                                             >
                                                 <IconComponent className="w-4 h-4 mr-2" />
                                                 {filter.label}
-                                            </button>
+                                            </motion.button>
                                         );
                                     })}
                                 </div>
@@ -385,18 +406,16 @@ const AnalysisCard = ({ analysis, index, onView, onDelete, onExport }) => {
             hour: '2-digit',
             minute: '2-digit'
         });
-    };
-
-    const getScoreColor = (score) => {
-        if (score >= 80) return 'text-green-400';
-        if (score >= 60) return 'text-yellow-400';
-        return 'text-red-400';
+    }; const getScoreColor = (score) => {
+        if (score >= 80) return 'text-green-600';
+        if (score >= 60) return 'text-amber-600';
+        return 'text-red-600';
     };
 
     const getScoreBadgeColor = (score) => {
-        if (score >= 80) return 'bg-green-900/30 text-green-400 border-green-500/30';
-        if (score >= 60) return 'bg-yellow-900/30 text-yellow-400 border-yellow-500/30';
-        return 'bg-red-900/30 text-red-400 border-red-500/30';
+        if (score >= 80) return 'bg-green-100 text-green-700 border-green-300';
+        if (score >= 60) return 'bg-amber-100 text-amber-700 border-amber-300';
+        return 'bg-red-100 text-red-700 border-red-300';
     };
 
     return (
@@ -404,50 +423,53 @@ const AnalysisCard = ({ analysis, index, onView, onDelete, onExport }) => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-xl p-6 hover:border-blue-500/30 transition-all duration-300"
+            whileHover={{ y: -4 }}
+            className="bg-white/80 backdrop-blur-sm border border-blue-200 rounded-2xl p-6 hover:bg-white hover:shadow-xl hover:shadow-blue-100 transition-all duration-300"
         >
             <div className="flex items-start justify-between">
                 <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-3">
+                    <div className="flex items-center space-x-3 mb-4">
                         <div className="flex items-center space-x-2">
-                            <User className="w-5 h-5 text-blue-400" />
-                            <h3 className="text-lg font-semibold text-white">{analysis.student_name}</h3>
+                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                <User className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-800">{analysis.student_name}</h3>
                         </div>
 
                         {analysis.github_username && (
-                            <div className="flex items-center space-x-1 text-orange-400">
-                                <Github className="w-4 h-4" />
-                                <span className="text-sm">{analysis.github_username}</span>
+                            <div className="flex items-center space-x-2 bg-orange-100 px-3 py-1 rounded-full">
+                                <Github className="w-4 h-4 text-orange-600" />
+                                <span className="text-sm font-medium text-orange-700">{analysis.github_username}</span>
                             </div>
                         )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <div className="flex items-center space-x-2">
-                            <div className={`px-3 py-1 rounded-lg border text-sm font-medium ${getScoreBadgeColor(analysis.overall_readiness_score)}`}>
+                            <div className={`px-4 py-2 rounded-xl border-2 text-sm font-bold ${getScoreBadgeColor(analysis.overall_readiness_score)}`}>
                                 {analysis.overall_readiness_score}% Ready
                             </div>
                         </div>
 
-                        <div className="flex items-center space-x-2 text-gray-400">
+                        <div className="flex items-center space-x-2 text-gray-600">
                             <Target className="w-4 h-4" />
-                            <span className="text-sm">{analysis.total_internships_matched} matches</span>
+                            <span className="text-sm font-medium">{analysis.total_internships_matched} matches</span>
                         </div>
 
-                        <div className="flex items-center space-x-2 text-gray-400">
+                        <div className="flex items-center space-x-2 text-gray-600">
                             <AlertCircle className="w-4 h-4" />
-                            <span className="text-sm">{analysis.total_gaps_detected} gaps</span>
+                            <span className="text-sm font-medium">{analysis.total_gaps_detected} gaps</span>
                         </div>
                     </div>
 
                     <div className="flex items-center space-x-4 mb-4">
-                        <div className="flex items-center space-x-2 text-gray-400">
+                        <div className="flex items-center space-x-2 text-gray-600">
                             <Calendar className="w-4 h-4" />
-                            <span className="text-sm">{formatDate(analysis.timestamp)}</span>
+                            <span className="text-sm font-medium">{formatDate(analysis.timestamp)}</span>
                         </div>
 
-                        <div className="text-sm text-gray-400">
-                            Level: <span className="text-blue-400 capitalize">{analysis.experience_level}</span>
+                        <div className="text-sm text-gray-600">
+                            Level: <span className="text-blue-600 capitalize font-semibold">{analysis.experience_level}</span>
                         </div>
                     </div>
 
@@ -456,13 +478,13 @@ const AnalysisCard = ({ analysis, index, onView, onDelete, onExport }) => {
                             {analysis.primary_skills.slice(0, 5).map((skill, skillIndex) => (
                                 <span
                                     key={skillIndex}
-                                    className="px-2 py-1 bg-blue-900/30 text-blue-400 text-xs rounded-lg border border-blue-500/30"
+                                    className="px-3 py-1 bg-blue-100 text-blue-700 text-xs rounded-full border border-blue-200 font-medium"
                                 >
                                     {skill}
                                 </span>
                             ))}
                             {analysis.primary_skills.length > 5 && (
-                                <span className="px-2 py-1 bg-gray-800 text-gray-400 text-xs rounded-lg">
+                                <span className="px-3 py-1 bg-gray-100 text-gray-600 text-xs rounded-full border border-gray-200">
                                     +{analysis.primary_skills.length - 5} more
                                 </span>
                             )}
@@ -470,33 +492,37 @@ const AnalysisCard = ({ analysis, index, onView, onDelete, onExport }) => {
                     )}
 
                     {analysis.analysis_summary && (
-                        <p className="text-gray-400 text-sm mb-4">{analysis.analysis_summary}</p>
+                        <p className="text-gray-600 text-sm mb-4 font-medium">{analysis.analysis_summary}</p>
                     )}
-                </div>
-
-                <div className="flex items-center space-x-2 ml-4">
-                    <button
+                </div>                <div className="flex items-center space-x-3 ml-4">
+                    <motion.button
                         onClick={onView}
-                        className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        whileHover={{ scale: 1.05, y: -1 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-lg font-medium"
                     >
-                        <Eye className="w-4 h-4 mr-1" />
+                        <Eye className="w-4 h-4 mr-2" />
                         View
-                    </button>
+                    </motion.button>
 
-                    <button
+                    <motion.button
                         onClick={onExport}
-                        className="flex items-center px-3 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors"
+                        whileHover={{ scale: 1.05, y: -1 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="flex items-center px-4 py-2 bg-white border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium"
                     >
-                        <Download className="w-4 h-4 mr-1" />
+                        <Download className="w-4 h-4 mr-2" />
                         Export
-                    </button>
+                    </motion.button>
 
-                    <button
+                    <motion.button
                         onClick={onDelete}
-                        className="flex items-center px-3 py-2 bg-red-900/50 text-red-400 rounded-lg hover:bg-red-900/70 transition-colors"
+                        whileHover={{ scale: 1.05, y: -1 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="flex items-center px-3 py-2 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 transition-all"
                     >
                         <Trash2 className="w-4 h-4" />
-                    </button>
+                    </motion.button>
                 </div>
             </div>
         </motion.div>
@@ -525,25 +551,26 @@ const AnalysisDetailsModal = ({ analysis, onClose }) => {
                 exit={{ opacity: 0 }}
                 className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
                 onClick={onClose}
+            >                <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="bg-white border border-blue-200 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
             >
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                    className="bg-gray-900 border border-gray-800 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <div className="p-6 border-b border-gray-800">
+                    <div className="p-6 border-b border-blue-200 bg-gradient-to-r from-blue-50 to-blue-100">
                         <div className="flex items-center justify-between">
-                            <h2 className="text-2xl font-bold text-white">Analysis Details</h2>
-                            <button
+                            <h2 className="text-2xl font-bold text-gray-800">Analysis Details</h2>
+                            <motion.button
                                 onClick={onClose}
-                                className="text-gray-400 hover:text-white transition-colors"
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                className="text-gray-500 hover:text-gray-700 transition-colors text-xl"
                             >
                                 ✕
-                            </button>
+                            </motion.button>
                         </div>
-                        <p className="text-gray-400 mt-1">
+                        <p className="text-gray-600 mt-1 font-medium">
                             Analysis from {formatDate(analysis.timestamp)}
                         </p>
                     </div>
@@ -551,24 +578,24 @@ const AnalysisDetailsModal = ({ analysis, onClose }) => {
                     <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
                         {/* Student Profile Section */}
                         <div className="mb-8">
-                            <h3 className="text-xl font-semibold text-white mb-4">Student Profile</h3>
-                            <div className="bg-gray-800/50 rounded-lg p-4">
+                            <h3 className="text-xl font-bold text-gray-800 mb-4">Student Profile</h3>
+                            <div className="bg-blue-50 rounded-xl p-6 border border-blue-200">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                     <div>
-                                        <p className="text-gray-400 text-sm">Name</p>
-                                        <p className="text-white">{analysis.student_profile?.name || 'N/A'}</p>
+                                        <p className="text-gray-600 text-sm font-semibold">Name</p>
+                                        <p className="text-gray-800 font-medium">{analysis.student_profile?.name || 'N/A'}</p>
                                     </div>
                                     <div>
-                                        <p className="text-gray-400 text-sm">Experience Level</p>
-                                        <p className="text-white capitalize">{analysis.student_profile?.experience_level || 'N/A'}</p>
+                                        <p className="text-gray-600 text-sm font-semibold">Experience Level</p>
+                                        <p className="text-gray-800 capitalize font-medium">{analysis.student_profile?.experience_level || 'N/A'}</p>
                                     </div>
                                     <div>
-                                        <p className="text-gray-400 text-sm">Email</p>
-                                        <p className="text-white">{analysis.student_profile?.email || 'N/A'}</p>
+                                        <p className="text-gray-600 text-sm font-semibold">Email</p>
+                                        <p className="text-gray-800 font-medium">{analysis.student_profile?.email || 'N/A'}</p>
                                     </div>
                                     <div>
-                                        <p className="text-gray-400 text-sm">Overall Readiness</p>
-                                        <p className="text-white font-semibold">{analysis.overall_readiness_score}%</p>
+                                        <p className="text-gray-600 text-sm font-semibold">Overall Readiness</p>
+                                        <p className="text-blue-600 font-bold text-lg">{analysis.overall_readiness_score}%</p>
                                     </div>
                                 </div>
 
@@ -652,8 +679,8 @@ const AnalysisDetailsModal = ({ analysis, onClose }) => {
                                             <div className="flex items-start justify-between">
                                                 <h4 className="text-red-400 font-medium">{gap.title}</h4>
                                                 <span className={`text-xs px-2 py-1 rounded ${gap.priority === 'high' ? 'bg-red-900/50 text-red-400' :
-                                                        gap.priority === 'medium' ? 'bg-yellow-900/50 text-yellow-400' :
-                                                            'bg-gray-800 text-gray-400'
+                                                    gap.priority === 'medium' ? 'bg-yellow-900/50 text-yellow-400' :
+                                                        'bg-gray-800 text-gray-400'
                                                     }`}>
                                                     {gap.priority}
                                                 </span>

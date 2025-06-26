@@ -8,6 +8,9 @@ import Signup from './pages/signup';
 import Home from './pages/home';
 import Landing from './pages/landing';
 import AnalysisHistory from './pages/AnalysisHistory';
+import Profile from './pages/Profile';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Component to handle routing based on auth state
@@ -37,6 +40,14 @@ const AppRoutes = () => {
                 element={isAuthenticated ? <Navigate to="/home" /> : <Signup />}
             />
             <Route
+                path="/forgot-password"
+                element={isAuthenticated ? <Navigate to="/home" /> : <ForgotPassword />}
+            />
+            <Route
+                path="/reset-password"
+                element={isAuthenticated ? <Navigate to="/home" /> : <ResetPassword />}
+            />
+            <Route
                 path="/home"
                 element={
                     <ProtectedRoute>
@@ -49,6 +60,14 @@ const AppRoutes = () => {
                 element={
                     <ProtectedRoute>
                         <AnalysisHistory />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/profile"
+                element={
+                    <ProtectedRoute>
+                        <Profile />
                     </ProtectedRoute>
                 }
             />

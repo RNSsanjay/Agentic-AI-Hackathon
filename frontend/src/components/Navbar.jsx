@@ -20,48 +20,49 @@ const Navbar = () => {
     };
 
     return (
-        <nav className="bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 backdrop-blur-xl border-b border-purple-500/20 sticky top-0 z-50 shadow-lg shadow-purple-500/10">
+        <nav className="bg-white/95 backdrop-blur-xl border-b border-blue-200 sticky top-0 z-50 shadow-lg shadow-blue-100/50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center h-16">
                     {/* Logo */}
                     <div className="flex items-center">
-                        <Link 
-                            to="/" 
-                            className="flex items-center space-x-2 group"
+                        <Link
+                            to="/"
+                            className="flex items-center space-x-3 group"
                         >
                             <div className="relative">
-                                <Sparkles className="w-8 h-8 text-purple-400 group-hover:text-purple-300 transition-all duration-300 group-hover:rotate-12" />
-                                <div className="absolute inset-0 bg-purple-400/20 rounded-full blur-md group-hover:blur-lg transition-all duration-300"></div>
+                                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+                                    <Sparkles className="w-6 h-6 text-white" />
+                                </div>
                             </div>
-                            <span className="text-xl font-bold bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent group-hover:from-purple-200 group-hover:to-white transition-all duration-300">
-                                Intern AI
+                            <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+                                InternAI
                             </span>
                         </Link>
                     </div>
 
                     {/* Navigation Links */}
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-3">
                         {isAuthenticated ? (
                             <>
                                 <Link
                                     to="/home"
-                                    className="flex items-center px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200 hover:scale-105 backdrop-blur-sm border border-transparent hover:border-purple-500/30"
+                                    className="flex items-center px-4 py-2 text-sm text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium"
                                 >
                                     <Home className="w-4 h-4 mr-2" />
                                     Home
                                 </Link>
                                 <Link
                                     to="/profile"
-                                    className="flex items-center px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200 hover:scale-105 backdrop-blur-sm border border-transparent hover:border-purple-500/30"
+                                    className="flex items-center px-4 py-2 text-sm text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 font-medium"
                                 >
                                     <User className="w-4 h-4 mr-2" />
                                     Profile
                                 </Link>
                                 <button
                                     onClick={handleLogout}
-                                    className="flex items-center px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-red-500/20 rounded-xl transition-all duration-200 hover:scale-105 backdrop-blur-sm border border-transparent hover:border-red-500/30 group"
+                                    className="flex items-center px-4 py-2 text-sm text-gray-700 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all duration-200 font-medium"
                                 >
-                                    <LogOut className="w-4 h-4 mr-2 group-hover:rotate-12 transition-transform duration-200" />
+                                    <LogOut className="w-4 h-4 mr-2" />
                                     Logout
                                 </button>
                             </>
@@ -69,13 +70,13 @@ const Navbar = () => {
                             <>
                                 <Link
                                     to="/login"
-                                    className="px-6 py-2 text-sm text-gray-300 hover:text-white transition-all duration-200 rounded-xl hover:bg-white/5 border border-transparent hover:border-purple-500/30"
+                                    className="px-6 py-2 text-sm text-gray-700 hover:text-blue-600 transition-all duration-200 rounded-xl hover:bg-blue-50 font-medium"
                                 >
                                     Login
                                 </Link>
                                 <Link
                                     to="/signup"
-                                    className="px-6 py-2 text-sm bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all duration-200 hover:scale-105 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 border border-purple-500/20"
+                                    className="px-6 py-2 text-sm bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg hover:shadow-xl font-medium"
                                 >
                                     Sign Up
                                 </Link>

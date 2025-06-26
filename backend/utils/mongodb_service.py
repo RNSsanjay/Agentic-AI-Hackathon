@@ -540,8 +540,102 @@ class MongoDBService:
                 "details": {"error_type": type(e).__name__}
             }
 
-# Create singleton instance
-mongodb_service = MongoDBService()
+    @ensure_connection
+    def get_user_analysis_count(self, user_id: str) -> int:
+        """Get the total number of analyses for a specific user"""
+        try:
+            if not self.collection:
+                logger.error("Collection not initialized")
+                return 0
+            
+            count = self.collection.count_documents({'user_id': user_id})
+            logger.info(f"📊 User {user_id} has {count} analyses")
+            return count
+            
+        except Exception as e:
+            logger.error(f"❌ Error getting user analysis count: {str(e)}")
+            return 0
 
-# Export for easier imports
-__all__ = ['mongodb_service', 'MongoDBService']
+    @ensure_connection
+    def get_user_analyses(self, user_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get recent analyses for a specific user"""
+        try:
+            if not self.collection:
+                logger.error("Collection not initialized")
+                return []
+            
+            # Get user's analyses sorted by timestamp (most recent first)
+            cursor = self.collection.find(
+                {'user_id': user_id}
+            ).sort('timestamp', -1).limit(limit)
+            
+            analyses = []
+            for doc in cursor:
+                # Convert ObjectId to string for JSON serialization
+                if '_id' in doc:
+                    doc['_id'] = str(doc['_id'])
+                analyses.append(doc)
+            
+            logger.info(f"📊 Retrieved {len(analyses)} analyses for user {user_id}")
+            return analyses
+            
+        except Exception as e:
+            logger.error(f"❌ Error getting user analyses: {str(e)}")
+            return []
+
+    @ensure_connection
+    def get_user_stats(self, user_id: str) -> Dict[str, Any]:
+        """Get comprehensive statistics for a specific user"""
+        try:
+            if not self.collection:
+                logger.error("Collection not initialized")
+                return {
+                    'analyses_completed': 0,
+                    'avg_readiness_score': 0,
+                    'total_internships_matched': 0,
+                    'total_gaps_detected': 0,
+                    'last_analysis_date': None
+                }
+            
+            # Aggregate user statistics
+            pipeline = [
+                {'$match': {'user_id': user_id}},
+                {'$group': {
+                    '_id': None,
+                    'total_analyses': {'$sum': 1},
+                    'avg_readiness': {'$avg': '$readiness_score'},
+                    'total_internships': {'$sum': {'$size': {'$ifNull': ['$internship_recommendations', []]}}},
+                    'total_gaps': {'$sum': {'$size': {'$ifNull': ['$portfolio_gaps', []]}}},
+                    'last_analysis': {'$max': '$timestamp'}
+                }}
+            ]
+            
+            result = list(self.collection.aggregate(pipeline))
+            
+            if result:
+                stats = result[0]
+                return {
+                    'analyses_completed': stats.get('total_analyses', 0),
+                    'avg_readiness_score': round(stats.get('avg_readiness', 0) * 100, 1) if stats.get('avg_readiness') else 0,
+                    'total_internships_matched': stats.get('total_internships', 0),
+                    'total_gaps_detected': stats.get('total_gaps', 0),
+                    'last_analysis_date': stats.get('last_analysis')
+                }
+            else:
+                return {
+                    'analyses_completed': 0,
+                    'avg_readiness_score': 0,
+                    'total_internships_matched': 0,
+                    'total_gaps_detected': 0,
+                    'last_analysis_date': None
+                }
+            
+        except Exception as e:
+            logger.error(f"❌ Error getting user stats: {str(e)}")
+            return {
+                'analyses_completed': 0,
+                'avg_readiness_score': 0,
+                'total_internships_matched': 0,
+                'total_gaps_detected': 0,
+                'last_analysis_date': None
+            }

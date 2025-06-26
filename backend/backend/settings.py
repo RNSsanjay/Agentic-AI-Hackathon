@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -122,6 +123,10 @@ GEMINI_API_KEY ="AIzaSyAdipWsk-EcwnaMhneZ7ihLKovVF6wWdkY"
 
 STATIC_URL = 'static/'
 
+# Media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
@@ -157,3 +162,16 @@ REST_FRAMEWORK = {
 import datetime
 JWT_SECRET_KEY = SECRET_KEY
 JWT_EXPIRATION_DELTA = datetime.timedelta(days=7)
+
+# Email settings for Gmail SMTP
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'coesnsihub@gmail.com'
+EMAIL_HOST_PASSWORD = 'drwe hiwf guea vsmc'
+DEFAULT_FROM_EMAIL = 'coesnsihub@gmail.com'
+
+# Environment variables for email (for production)
+GMAIL_EMAIL = 'coesnsihub@gmail.com'
+GMAIL_APP_PASSWORD = 'drwe hiwf guea vsmc'
