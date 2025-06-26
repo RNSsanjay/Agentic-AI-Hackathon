@@ -6,6 +6,9 @@ urlpatterns = [
     # Authentication endpoints
     path('auth/register/', views.register_user, name='register'),
     path('auth/login/', views.login_user, name='login'),
+    path('auth/forgot-password/', views.forgot_password, name='forgot_password'),
+    path('auth/reset-password/', views.reset_password, name='reset_password'),
+    path('auth/change-password/', views.change_password, name='change_password'),
     
     # Resume analysis endpoints
     path('analyze/resume/', ResumeAnalysisView.as_view(), name='analyze_resume'),
@@ -22,6 +25,11 @@ urlpatterns = [
     path('analysis/<str:analysis_id>/', views.get_analysis_by_id, name='get_analysis_by_id'),
     path('analysis/<str:analysis_id>/delete/', views.delete_analysis, name='delete_analysis'),
    
-      # Health check endpoint
+    # Health check endpoint
     path('test/mongodb/', views.test_mongodb_connection, name='test_mongodb_connection'),
+
+    # Profile endpoints
+    path('profile/', views.user_profile, name='user_profile'),
+    path('profile/avatar/', views.upload_avatar, name='upload_avatar'),
+    path('profile/stats/', views.profile_stats, name='profile_stats'),
 ]
