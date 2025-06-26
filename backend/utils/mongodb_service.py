@@ -302,20 +302,26 @@ class MongoDBService:
 
             results = []
             for doc in cursor:
+                if doc is None:
+                    continue
+                    
                 doc["_id"] = str(doc["_id"])
+                student_profile = doc.get("student_profile") or {}
+                github_analysis = doc.get("github_analysis") or {}
+                
                 summary = {
-                    "analysis_id": doc["analysis_id"],
-                    "user_id": doc["user_id"],
-                    "timestamp": doc["timestamp"],
-                    "student_name": doc.get("student_profile", {}).get("name", "Unknown"),
+                    "analysis_id": doc.get("analysis_id", "unknown"),
+                    "user_id": doc.get("user_id", "unknown"),
+                    "timestamp": doc.get("timestamp"),
+                    "student_name": student_profile.get("name", "Unknown"),
                     "overall_readiness_score": doc.get("overall_readiness_score", 0.0),
                     "total_internships_matched": doc.get("total_internships_matched", 0),
                     "total_gaps_detected": doc.get("total_gaps_detected", 0),
                     "analysis_summary": doc.get("analysis_summary", ""),
-                    "github_username": doc.get("github_analysis", {}).get("username"),
-                    "primary_skills": doc.get("student_profile", {}).get("skills", [])[:5],
-                    "domains": doc.get("student_profile", {}).get("domains", []),
-                    "experience_level": doc.get("student_profile", {}).get("experience_level", "entry-level")
+                    "github_username": github_analysis.get("username"),
+                    "primary_skills": student_profile.get("skills", [])[:5],
+                    "domains": student_profile.get("domains", []),
+                    "experience_level": student_profile.get("experience_level", "entry-level")
                 }
                 results.append(summary)
 

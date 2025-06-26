@@ -18,9 +18,9 @@ urlpatterns = [
     
     # Analysis history endpoints
     path('analysis/history/', views.get_analysis_history, name='get_analysis_history'),
+    path('analysis/statistics/', views.get_analysis_statistics, name='get_analysis_statistics'),
     path('analysis/<str:analysis_id>/', views.get_analysis_by_id, name='get_analysis_by_id'),
     path('analysis/<str:analysis_id>/delete/', views.delete_analysis, name='delete_analysis'),
-    path('analysis/statistics/', views.get_analysis_statistics, name='get_analysis_statistics'),
    
       # Health check endpoint
     path('test/mongodb/', views.test_mongodb_connection, name='test_mongodb_connection'),

@@ -102,13 +102,11 @@ const Home = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-
       // Fetch internships (always needed for available count)
       const internshipsResponse = await axios.get('http://127.0.0.1:8000/api/internships/');
       if (internshipsResponse.data.status === 'success') {
         setInternships(internshipsResponse.data.internships);
       }
-
       // Only fetch dashboard stats to check if using_real_data is true
       // If no real analysis data exists, we'll show zeros
       const statsResponse = await axios.get('http://127.0.0.1:8000/api/dashboard/stats/');
@@ -120,13 +118,11 @@ const Home = () => {
           setDashboardStats(null); // Force zero state when no real analysis data
         }
       }
-
       // Fetch recent activity
       const activityResponse = await axios.get('http://127.0.0.1:8000/api/activity/');
       if (activityResponse.data.status === 'success') {
         setRecentActivity(activityResponse.data.activity);
       }
-
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       toast.error('Failed to load dashboard data');
@@ -135,11 +131,8 @@ const Home = () => {
     }
   };
 
-  // ⚡ REAL-TIME DASHBOARD STATS LOGIC ⚡
-  // Priority: 1) Fresh analysis results (analysisResults) 2) Zero state (no database fallback)
-  // This ensures home page shows real-time analysis data immediately, not stale DB values
+  // Dashboard stats logic
   const dashboardStatsData = analysisResults ? [
-    // PRIORITY #1: Fresh analysis results - show real-time data
     {
       label: 'Readiness Score',
       value: analysisResults.readiness_evaluations?.[0]
@@ -177,8 +170,6 @@ const Home = () => {
       bgColor: 'from-purple-600/20 to-purple-400/20'
     }
   ] : [
-    // PRIORITY #2: Zero state - always show zeros when no analysis results
-    // No database fallback to ensure clean zero state
     {
       label: 'Readiness Score',
       value: '0%',
@@ -246,44 +237,6 @@ const Home = () => {
           <CheckCircle className="w-4 h-4" />,
     status: 'pending'
   }));
-
-  const stats = analysisResults ? [
-    {
-      label: 'Internships Matched',
-      value: analysisResults.internship_recommendations?.length || 0,
-      change: `+${analysisResults.internship_recommendations?.length || 0} new`,
-      icon: <Target className="w-5 h-5" />,
-      color: 'text-blue-400'
-    },
-    {
-      label: 'Readiness Score',
-      value: analysisResults.readiness_evaluations?.[0]
-        ? `${Math.round(analysisResults.readiness_evaluations[0].readiness_score * 100)}%`
-        : '0%',
-      change: 'Latest analysis',
-      icon: <BarChart3 className="w-5 h-5" />,
-      color: 'text-green-400'
-    },
-    {
-      label: 'Skills Identified',
-      value: analysisResults.student_profile?.skills?.length || 0,
-      change: `+${analysisResults.student_profile?.skills?.length || 0}`,
-      icon: <Brain className="w-5 h-5" />,
-      color: 'text-purple-400'
-    },
-    {
-      label: 'Portfolio Gaps',
-      value: analysisResults.portfolio_gaps?.length || 0,
-      change: 'To improve',
-      icon: <AlertCircle className="w-5 h-5" />,
-      color: 'text-orange-400'
-    }
-  ] : [
-    { label: 'Internships Matched', value: '0', change: 'Upload resume to start', icon: <Target className="w-5 h-5" />, color: 'text-gray-400' },
-    { label: 'Readiness Score', value: '0%', change: 'Analysis pending', icon: <BarChart3 className="w-5 h-5" />, color: 'text-gray-400' },
-    { label: 'Skills Identified', value: '0', change: 'Analysis pending', icon: <Brain className="w-5 h-5" />, color: 'text-gray-400' },
-    { label: 'Portfolio Gaps', value: '0', change: 'Analysis pending', icon: <AlertCircle className="w-5 h-5" />, color: 'text-gray-400' }
-  ];
 
   const validateFile = (file) => {
     const errors = [];
@@ -440,18 +393,14 @@ const Home = () => {
     }
   };
 
-  // Function to refresh and reset dashboard stats to zero state
   const refreshDashboardToZero = async () => {
     setDashboardStats(null);
     setAnalysisResults(null);
-
-    // Re-fetch only internships for available count
     try {
       const internshipsResponse = await axios.get('http://127.0.0.1:8000/api/internships/');
       if (internshipsResponse.data.status === 'success') {
         setInternships(internshipsResponse.data.internships);
       }
-
       toast.success('Dashboard refreshed - all stats reset to zero', {
         icon: '🔄',
         duration: 2000
@@ -467,11 +416,7 @@ const Home = () => {
     setUploadedResume(null);
     setError('');
     setSelectedPreferences(['Web Development', 'Data Science']);
-
-    // Reset dashboard stats to force zero state
     setDashboardStats(null);
-
-    // Show confirmation that stats have been reset
     toast.info('Dashboard reset to zero state', {
       icon: '🔄',
       duration: 2000
@@ -592,7 +537,6 @@ const Home = () => {
               availableDomains={AVAILABLE_DOMAINS}
               quickActions={QUICK_ACTIONS}
               recentActivity={activityData}
-              navigate={navigate}
               handlePreferenceToggle={handlePreferenceToggle}
               handleFileUpload={handleFileUpload}
               retryAnalysis={retryAnalysis}
@@ -605,6 +549,7 @@ const Home = () => {
               getStatusIcon={getStatusIcon}
               getStatusColor={getStatusColor}
               groupCommunicationsByAgent={groupCommunicationsByAgent}
+              navigate={navigate}
             />
             <Sidebar
               analysisResults={analysisResults}
@@ -703,7 +648,6 @@ const MainContent = ({
   availableDomains,
   quickActions,
   recentActivity,
-  navigate,
   handlePreferenceToggle,
   handleFileUpload,
   retryAnalysis,
@@ -715,7 +659,8 @@ const MainContent = ({
   downloadAnalysis,
   getStatusIcon,
   getStatusColor,
-  groupCommunicationsByAgent
+  groupCommunicationsByAgent,
+  navigate
 }) => {
   return (
     <div className="lg:col-span-3 space-y-6">
@@ -829,7 +774,7 @@ const UploadSection = ({
             />
             <div className="space-y-2">
               <motion.div
-                className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg text-white font-semibold hover:from-blue-700 hover:to-purple-700 transition-all disabled:opacity-50 group-hover:shadow-lg group-hover:shadow-blue-500/25"
+                className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg text-white font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-blue-500/25"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -1026,10 +971,10 @@ const AnalysisCompleteBanner = ({ analysisResults, showAgentComm, setShowAgentCo
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => navigate('/analysis-history')}
-          className="px-4 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-300 rounded-lg text-sm flex items-center gap-2 transition-all"
+          className="px-4 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-300 rounded-lg text-sm flex items-center gap-2 transition-all font-medium"
         >
           <Clock className="w-4 h-4" />
-          View in History
+          View History
         </motion.button>
         <motion.button
           whileHover={{ scale: 1.05 }}
@@ -1755,38 +1700,6 @@ const InternshipRecommendations = ({ analysisResults }) => {
         <StatCard value={uniqueDomains} label="Domains" color="blue" />
         <StatCard value={highMatchCount} label="High Match" color="yellow" />
       </div>
-      <style jsx>{`
-        .overflow-x-auto::-webkit-scrollbar {
-          height: 8px;
-        }
-        .overflow-x-auto::-webkit-scrollbar-track {
-          background: rgba(31, 41, 55, 0.5);
-          border-radius: 4px;
-        }
-        .overflow-x-auto::-webkit-scrollbar-thumb {
-          background: linear-gradient(90deg, rgba(99, 102, 241, 0.7), rgba(147, 51, 234, 0.7));
-          border-radius: 4px;
-        }
-        .overflow-x-auto::-webkit-scrollbar-thumb:hover {
-          background: linear-gradient(90deg, rgba(99, 102, 241, 0.9), rgba(147, 51, 234, 0.9));
-        }
-        .overflow-x-auto {
-          scroll-behavior: smooth;
-        }
-        @keyframes slideInRight {
-          from {
-            transform: translateX(100px);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-        .animate-slide-in {
-          animation: slideInRight 0.6s ease-out forwards;
-        }
-      `}</style>
     </motion.div>
   );
 };
