@@ -592,6 +592,7 @@ const Home = () => {
               availableDomains={AVAILABLE_DOMAINS}
               quickActions={QUICK_ACTIONS}
               recentActivity={activityData}
+              navigate={navigate}
               handlePreferenceToggle={handlePreferenceToggle}
               handleFileUpload={handleFileUpload}
               retryAnalysis={retryAnalysis}
@@ -702,6 +703,7 @@ const MainContent = ({
   availableDomains,
   quickActions,
   recentActivity,
+  navigate,
   handlePreferenceToggle,
   handleFileUpload,
   retryAnalysis,
