@@ -31,6 +31,14 @@ except ImportError:
     MONGODB_AVAILABLE = False
     mongodb_service = None
 
+# Import RAG system
+try:
+    from utils.rag_system import internship_rag
+    RAG_AVAILABLE = True
+except ImportError:
+    RAG_AVAILABLE = False
+    internship_rag = None
+
 # Simple cache for latest analysis results (in production, use Redis or database)
 latest_analysis_cache = {
     'readiness_score': None,
@@ -807,56 +815,109 @@ def change_password(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_internships(request):
-    """Fetch all internships from the JSON file"""
+    """Fetch all internships using the RAG system with real-time data"""
     try:
-        # Load internships from JSON file
-        json_file_path = Path(__file__).parent.parent / 'data' / 'internships.json'
-        
-        with open(json_file_path, 'r', encoding='utf-8') as file:
-            data = json.load(file)
-            internships = data.get('internships', [])
+        if not RAG_AVAILABLE or not internship_rag:
+            # Fallback to file-based approach
+            json_file_path = Path(__file__).parent.parent / 'data' / 'internships.json'
+            
+            if not json_file_path.exists():
+                return Response({
+                    'status': 'error',
+                    'error': 'No internships data available. Please run the scraper first.',
+                    'internships': [],
+                    'total_count': 0
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            with open(json_file_path, 'r', encoding='utf-8') as file:
+                data = json.load(file)
+                internships = data.get('internships', [])
+        else:
+            # Use RAG system for real-time data
+            internship_rag.refresh_data()  # Ensure we have the latest data
+            internships = internship_rag.get_all_internships()
         
         # Apply filters if provided
         domain = request.GET.get('domain', 'all')
         experience = request.GET.get('experience', 'all')
         search = request.GET.get('search', '').lower()
-        sort_by = request.GET.get('sort_by', 'matching_score')
+        sort_by = request.GET.get('sort_by', 'scraped_at')
+        limit = int(request.GET.get('limit', 50))
         
-        # Filter by domain
-        if domain != 'all':
-            internships = [i for i in internships if domain.lower() in i.get('domains', [])]
-        
-        # Filter by experience level
-        if experience != 'all':
-            internships = [i for i in internships if experience.lower() == i.get('experience_level', '').lower()]
-        
-        # Search filter
-        if search:
-            internships = [
-                i for i in internships 
-                if search in i.get('title', '').lower() or 
-                   search in i.get('company', '').lower() or
-                   search in i.get('description', '').lower()
-            ]
+        # Search filter using RAG if available
+        if search and RAG_AVAILABLE and internship_rag:
+            internships = internship_rag.search_internships(search, limit=limit)
+        else:
+            # Filter by domain
+            if domain != 'all':
+                internships = [i for i in internships if domain.lower() in i.get('domain', '').lower()]
+            
+            # Filter by experience level
+            if experience != 'all':
+                internships = [i for i in internships if experience.lower() == i.get('experience_level', '').lower()]
+            
+            # Basic search filter
+            if search:
+                internships = [
+                    i for i in internships 
+                    if search in i.get('title', '').lower() or 
+                       search in i.get('company', '').lower() or
+                       search in i.get('description', '').lower() or
+                       search in i.get('domain', '').lower()
+                ]
         
         # Sort internships
-        if sort_by == 'matching_score':
-            internships.sort(key=lambda x: x.get('matching_score', 0), reverse=True)
+        if sort_by == 'scraped_at':
+            internships.sort(key=lambda x: x.get('scraped_at', ''), reverse=True)
         elif sort_by == 'deadline':
-            internships.sort(key=lambda x: x.get('deadline', ''))
+            internships.sort(key=lambda x: x.get('application_deadline', ''))
         elif sort_by == 'company':
             internships.sort(key=lambda x: x.get('company', ''))
+        elif sort_by == 'matching_score':
+            internships.sort(key=lambda x: x.get('matching_score', 0), reverse=True)
+        
+        # Limit results if not using search
+        if not search or not RAG_AVAILABLE:
+            internships = internships[:limit]
+        
+        # Add metadata
+        for internship in internships:
+            # Add freshness indicator
+            scraped_at = internship.get('scraped_at')
+            if scraped_at:
+                try:
+                    scraped_date = datetime.strptime(scraped_at, '%Y-%m-%d %H:%M:%S')
+                    hours_old = (datetime.now() - scraped_date).total_seconds() / 3600
+                    if hours_old < 24:
+                        internship['freshness'] = 'fresh'
+                    elif hours_old < 72:
+                        internship['freshness'] = 'recent'
+                    else:
+                        internship['freshness'] = 'older'
+                except ValueError:
+                    internship['freshness'] = 'unknown'
+            else:
+                internship['freshness'] = 'unknown'
         
         return Response({
             'status': 'success',
             'internships': internships,
-            'total_count': len(internships)
+            'total_count': len(internships),
+            'using_rag': RAG_AVAILABLE,
+            'filters_applied': {
+                'domain': domain,
+                'experience': experience,
+                'search': search,
+                'sort_by': sort_by
+            }
         })
     
     except FileNotFoundError:
         return Response({
             'status': 'error',
-            'error': 'Internships data file not found'
+            'error': 'Internships data file not found. Please run the scraper first.',
+            'internships': [],
+            'total_count': 0
         }, status=status.HTTP_404_NOT_FOUND)
     
     except json.JSONDecodeError:
@@ -874,16 +935,40 @@ def get_internships(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_dashboard_stats(request):
-    """Get dashboard statistics"""
+    """Get dashboard statistics with real-time data"""
     try:
-        # Return mock stats for now
         stats = {
-            'using_real_data': False,
-            'readiness_score': 0,
-            'internship_matches': 0,
-            'gaps_detected': 0,
+            'using_real_data': True,
+            'readiness_score': latest_analysis_cache.get('readiness_score', 0),
+            'internship_matches': latest_analysis_cache.get('internship_matches', 0),
+            'gaps_detected': latest_analysis_cache.get('gaps_detected', 0),
             'skills_identified': 0
         }
+        
+        # Get internship statistics from RAG system
+        if RAG_AVAILABLE and internship_rag:
+            internship_rag.refresh_data()
+            internship_stats = internship_rag.get_internship_stats()
+            stats.update({
+                'total_internships': internship_stats.get('total', 0),
+                'recent_additions': internship_stats.get('recent_additions', 0),
+                'domains_available': len(internship_stats.get('by_domain', {})),
+                'sources_active': len(internship_stats.get('by_source', {})),
+                'internship_breakdown': internship_stats
+            })
+        else:
+            # Fallback to file-based stats
+            try:
+                json_file_path = Path(__file__).parent.parent / 'data' / 'internships.json'
+                if json_file_path.exists():
+                    with open(json_file_path, 'r', encoding='utf-8') as file:
+                        data = json.load(file)
+                        internships = data.get('internships', [])
+                        stats['total_internships'] = len(internships)
+                else:
+                    stats['total_internships'] = 0
+            except:
+                stats['total_internships'] = 0
         
         return Response({
             'status': 'success',

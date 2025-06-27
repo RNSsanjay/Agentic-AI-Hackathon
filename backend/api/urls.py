@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import views, scrap
 from .Agent import ResumeAnalysisView
 
 urlpatterns = [
@@ -19,14 +19,21 @@ urlpatterns = [
     path('dashboard/update-cache/', views.update_dashboard_cache, name='update_dashboard_cache'),
     path('activity/', views.get_recent_activity, name='get_recent_activity'),
     
+    # Scraping endpoints
+    path('scrape/internships/', scrap.scrape_internships, name='scrape_internships'),
+    path('scrape/task/<str:task_id>/', scrap.get_scraping_task_status, name='get_scraping_task_status'),
+    path('scrape/clean-expired/', scrap.clean_expired_internships, name='clean_expired_internships'),
+    path('scrape/stats/', scrap.get_scraping_stats, name='get_scraping_stats'),
+    
     # Analysis history endpoints
     path('analysis/history/', views.get_analysis_history, name='get_analysis_history'),
     path('analysis/statistics/', views.get_analysis_statistics, name='get_analysis_statistics'),
     path('analysis/<str:analysis_id>/', views.get_analysis_by_id, name='get_analysis_by_id'),
     path('analysis/<str:analysis_id>/delete/', views.delete_analysis, name='delete_analysis'),
    
-    # Health check endpoint
+    # Health check endpoints
     path('test/mongodb/', views.test_mongodb_connection, name='test_mongodb_connection'),
+    path('health/', scrap.health_check, name='scraper_health_check'),
 
     # Profile endpoints
     path('profile/', views.user_profile, name='user_profile'),

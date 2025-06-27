@@ -1,0 +1,830 @@
+import json
+import asyncio
+import logging
+import random
+import os
+from datetime import datetime, timedelta
+from typing import List, Dict, Any, Optional
+from django.conf import settings
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework import status
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
+from pathlib import Path
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class InternshipScraper:
+    def __init__(self):
+        self.timeout = 30000  # 30 seconds
+        self.max_retries = 3
+        self.retry_delay = 2000  # 2 seconds
+        self.data_file_path = os.path.join(settings.BASE_DIR, 'data', 'internships.json')
+        self.ensure_data_directory()
+
+    def ensure_data_directory(self):
+        """Ensure the data directory exists"""
+        data_dir = os.path.dirname(self.data_file_path)
+        os.makedirs(data_dir, exist_ok=True)
+
+    def load_existing_internships(self) -> Dict:
+        """Load existing internships from JSON file"""
+        try:
+            if os.path.exists(self.data_file_path):
+                with open(self.data_file_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            return {"internships": []}
+        except Exception as e:
+            logger.error(f"Error loading existing internships: {e}")
+            return {"internships": []}
+
+    def save_internships(self, internships: List[Dict]):
+        """Save internships to JSON file with duplicate checking and deadline filtering"""
+        try:
+            # Load existing data
+            existing_data = self.load_existing_internships()
+            existing_internships = existing_data.get("internships", [])
+            
+            # Filter out expired internships
+            current_date = datetime.now()
+            active_internships = []
+            
+            for internship in existing_internships:
+                deadline_str = internship.get('application_deadline')
+                if deadline_str:
+                    try:
+                        deadline = datetime.strptime(deadline_str, '%Y-%m-%d')
+                        if deadline >= current_date:
+                            active_internships.append(internship)
+                    except ValueError:
+                        # Keep internships with invalid date formats
+                        active_internships.append(internship)
+                else:
+                    # Keep internships without deadlines
+                    active_internships.append(internship)
+            
+            # Add new internships (avoiding duplicates)
+            existing_ids = {internship.get('id') for internship in active_internships if internship.get('id')}
+            existing_titles_companies = {(internship.get('title', '').lower(), internship.get('company', '').lower()) 
+                                       for internship in active_internships}
+            
+            for new_internship in internships:
+                # Check for duplicates
+                new_id = new_internship.get('id')
+                new_title_company = (new_internship.get('title', '').lower(), new_internship.get('company', '').lower())
+                
+                if new_id not in existing_ids and new_title_company not in existing_titles_companies:
+                    # Generate unique ID if not present
+                    if not new_id:
+                        new_internship['id'] = self.generate_unique_id(new_internship)
+                    
+                    # Set default deadline if not present (30 days from now)
+                    if not new_internship.get('application_deadline'):
+                        deadline = current_date + timedelta(days=30)
+                        new_internship['application_deadline'] = deadline.strftime('%Y-%m-%d')
+                    
+                    active_internships.append(new_internship)
+            
+            # Save updated data
+            updated_data = {"internships": active_internships}
+            with open(self.data_file_path, 'w', encoding='utf-8') as f:
+                json.dump(updated_data, f, indent=2, ensure_ascii=False)
+            
+            logger.info(f"Saved {len(active_internships)} internships (removed {len(existing_internships) - len(active_internships)} expired)")
+            return len(active_internships)
+            
+        except Exception as e:
+            logger.error(f"Error saving internships: {e}")
+            return 0
+
+    def generate_unique_id(self, internship: Dict) -> str:
+        """Generate a unique ID for an internship"""
+        title = internship.get('title', '').upper()
+        company = internship.get('company', '').upper()
+        source = internship.get('source', 'SCRAPED').upper()
+        
+        # Create a base ID from title and company
+        base_id = f"{source}_{title[:3]}_{company[:3]}_{random.randint(100, 999)}"
+        return base_id.replace(' ', '_').replace('.', '').replace(',', '')
+
+    async def scrape_indeed(self, keyword="internship", location="India", max_pages=2):
+        """Scrape internships from Indeed with improved robustness"""
+        internships = []
+        user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        ]
+
+        async with async_playwright() as p:
+            browser = None
+            try:
+                browser = await p.chromium.launch(
+                    headless=True,
+                    args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+                )
+                page = await browser.new_page()
+
+                for page_num in range(max_pages):
+                    try:
+                        start = page_num * 10
+                        url = f"https://in.indeed.com/jobs?q={keyword}&l={location}&start={start}"
+
+                        logger.info(f"Scraping Indeed page {page_num + 1}: {url}")
+
+                        # Randomly select a user agent
+                        await page.set_extra_http_headers({
+                            'User-Agent': random.choice(user_agents)
+                        })
+
+                        # Try to load the page with retries
+                        await self._load_page_with_retry(page, url)
+
+                        # Wait for job cards to be present
+                        await page.wait_for_selector('[data-jk]', timeout=self.timeout)
+
+                        # Extract job listings
+                        job_cards = await page.query_selector_all('[data-jk]')
+
+                        if not job_cards:
+                            logger.warning(f"No job cards found on page {page_num + 1}")
+                            continue
+
+                        for card in job_cards:
+                            try:
+                                internship = await self._extract_indeed_job_data(card)
+                                if internship and self._is_internship_relevant(internship):
+                                    internships.append(internship)
+                            except Exception as e:
+                                logger.error(f"Error extracting job data: {str(e)}")
+                                continue
+
+                        logger.info(f"Scraped {len(job_cards)} job cards from page {page_num + 1}")
+
+                    except Exception as e:
+                        logger.error(f"Error scraping page {page_num + 1}: {str(e)}")
+                        continue
+
+            except Exception as e:
+                logger.error(f"Error scraping Indeed: {str(e)}")
+            finally:
+                if browser:
+                    await browser.close()
+
+        return internships
+
+    async def scrape_linkedin(self, keyword="internship", location="India", max_pages=2):
+        """Scrape internships from LinkedIn with improved robustness"""
+        internships = []
+        user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        ]
+
+        async with async_playwright() as p:
+            browser = None
+            try:
+                browser = await p.chromium.launch(
+                    headless=True,
+                    args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+                )
+                page = await browser.new_page()
+
+                for page_num in range(max_pages):
+                    try:
+                        start = page_num * 25
+                        url = f"https://www.linkedin.com/jobs/search?keywords={keyword}&location={location}&start={start}&f_E=1"
+
+                        logger.info(f"Scraping LinkedIn page {page_num + 1}: {url}")
+
+                        # Randomly select a user agent
+                        await page.set_extra_http_headers({
+                            'User-Agent': random.choice(user_agents)
+                        })
+
+                        # Try to load the page with retries
+                        await self._load_page_with_retry(page, url)
+
+                        # Wait for job cards to be present
+                        await page.wait_for_selector('.job-search-card', timeout=self.timeout)
+
+                        # Extract job listings
+                        job_cards = await page.query_selector_all('.job-search-card')
+
+                        if not job_cards:
+                            logger.warning(f"No job cards found on page {page_num + 1}")
+                            continue
+
+                        for card in job_cards:
+                            try:
+                                internship = await self._extract_linkedin_job_data(card)
+                                if internship and self._is_internship_relevant(internship):
+                                    internships.append(internship)
+                            except Exception as e:
+                                logger.error(f"Error extracting LinkedIn job data: {str(e)}")
+                                continue
+
+                        logger.info(f"Scraped {len(job_cards)} job cards from page {page_num + 1}")
+
+                    except Exception as e:
+                        logger.error(f"Error scraping LinkedIn page {page_num + 1}: {str(e)}")
+                        continue
+
+            except Exception as e:
+                logger.error(f"Error scraping LinkedIn: {str(e)}")
+            finally:
+                if browser:
+                    await browser.close()
+
+        return internships
+
+    async def scrape_naukri(self, keyword="internship", location="India", max_pages=2):
+        """Scrape internships from Naukri.com with improved robustness"""
+        internships = []
+        user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        ]
+
+        async with async_playwright() as p:
+            browser = None
+            try:
+                browser = await p.chromium.launch(
+                    headless=True,
+                    args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+                )
+                page = await browser.new_page()
+
+                for page_num in range(1, max_pages + 1):
+                    try:
+                        # URL encode the parameters
+                        encoded_keyword = keyword.replace(' ', '%20')
+                        encoded_location = location.replace(' ', '%20').replace(',', '%2C')
+                        url = f"https://www.naukri.com/{encoded_keyword}-jobs-in-{encoded_location}-{page_num}"
+
+                        logger.info(f"Scraping Naukri page {page_num}: {url}")
+
+                        # Randomly select a user agent
+                        await page.set_extra_http_headers({
+                            'User-Agent': random.choice(user_agents)
+                        })
+
+                        # Try to load the page with retries
+                        await self._load_page_with_retry(page, url)
+
+                        # Wait for job cards to be present
+                        await page.wait_for_selector('.jobTuple', timeout=self.timeout)
+
+                        # Extract job listings
+                        job_cards = await page.query_selector_all('.jobTuple')
+
+                        if not job_cards:
+                            logger.warning(f"No job cards found on page {page_num}")
+                            continue
+
+                        for card in job_cards[:10]:  # Limit to first 10 per page
+                            try:
+                                internship = await self._extract_naukri_job_data(card)
+                                if internship and self._is_internship_relevant(internship):
+                                    internships.append(internship)
+                            except Exception as e:
+                                logger.error(f"Error extracting Naukri job data: {str(e)}")
+                                continue
+
+                        logger.info(f"Scraped {len(job_cards)} job cards from page {page_num}")
+
+                    except Exception as e:
+                        logger.error(f"Error scraping Naukri page {page_num}: {str(e)}")
+                        continue
+
+            except Exception as e:
+                logger.error(f"Error scraping Naukri: {str(e)}")
+            finally:
+                if browser:
+                    await browser.close()
+
+        return internships
+
+    def _is_internship_relevant(self, internship: Dict) -> bool:
+        """Check if the scraped job is relevant (internship-related)"""
+        title = internship.get('title', '').lower()
+        internship_keywords = ['intern', 'internship', 'trainee', 'student', 'fresher', 'graduate program']
+        return any(keyword in title for keyword in internship_keywords)
+
+    async def _load_page_with_retry(self, page, url):
+        """Helper method to load a page with retries"""
+        for attempt in range(self.max_retries):
+            try:
+                await page.goto(url, wait_until="domcontentloaded", timeout=self.timeout)
+                await page.wait_for_timeout(self.retry_delay)
+                return
+            except PlaywrightTimeoutError as e:
+                if attempt == self.max_retries - 1:
+                    raise
+                logger.warning(f"Timeout loading page (attempt {attempt + 1}): {e}")
+                await page.wait_for_timeout(self.retry_delay * (attempt + 1))
+            except Exception as e:
+                if attempt == self.max_retries - 1:
+                    raise
+                logger.warning(f"Error loading page (attempt {attempt + 1}): {e}")
+                await page.wait_for_timeout(self.retry_delay * (attempt + 1))
+
+    async def _get_inner_text(self, element, selector):
+        """Helper method to get inner text of an element with retries"""
+        for attempt in range(self.max_retries):
+            try:
+                elem = await element.query_selector(selector)
+                if elem:
+                    text = await elem.inner_text()
+                    return text.strip() if text else "N/A"
+                return "N/A"
+            except Exception as e:
+                if attempt == self.max_retries - 1:
+                    logger.error(f"Failed to get inner text after {self.max_retries} attempts: {e}")
+                    return "N/A"
+                await asyncio.sleep(0.5)
+
+    async def _get_attribute(self, element, selector, attribute):
+        """Helper method to get attribute of an element with retries"""
+        for attempt in range(self.max_retries):
+            try:
+                elem = await element.query_selector(selector)
+                if elem:
+                    return await elem.get_attribute(attribute)
+                return ""
+            except Exception as e:
+                if attempt == self.max_retries - 1:
+                    logger.error(f"Failed to get attribute after {self.max_retries} attempts: {e}")
+                    return ""
+                await asyncio.sleep(0.5)
+
+    async def _extract_indeed_job_data(self, card):
+        """Extract job data from Indeed job card"""
+        try:
+            title = await self._get_inner_text(card, 'h2 a span')
+            company = await self._get_inner_text(card, '[data-testid="company-name"]')
+            location_text = await self._get_inner_text(card, '[data-testid="job-location"]')
+            summary = await self._get_inner_text(card, '.slider_container .slider_item')
+            link = await self._get_attribute(card, 'h2 a', 'href')
+
+            if not title or title == "N/A":
+                return None
+
+            if link and not link.startswith('http'):
+                link = f"https://in.indeed.com{link}"
+
+            # Extract salary if available
+            salary_elem = await card.query_selector('[data-testid="salary-snippet"]')
+            salary = await salary_elem.inner_text() if salary_elem else "Not specified"
+
+            return {
+                'title': self._clean_text(title),
+                'company': self._clean_text(company),
+                'location': self._clean_text(location_text),
+                'domain': self._extract_domain_from_title(title),
+                'duration': "Not specified",
+                'stipend': salary,
+                'requirements': self._extract_skills_from_text(summary),
+                'preferred_skills': [],
+                'description': self._truncate_text(summary, 200),
+                'responsibilities': [],
+                'qualifications': [summary] if summary and summary != "N/A" else [],
+                'experience_level': "entry-level",
+                'tags': ["remote-friendly", "real-time"],
+                'link': link,
+                'source': 'Indeed',
+                'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+        except Exception as e:
+            logger.error(f"Error extracting Indeed job data: {str(e)}")
+            return None
+
+    async def _extract_linkedin_job_data(self, card):
+        """Extract job data from LinkedIn job card"""
+        try:
+            title = await self._get_inner_text(card, '.base-search-card__title')
+            company = await self._get_inner_text(card, '.base-search-card__subtitle')
+            location_text = await self._get_inner_text(card, '.job-search-card__location')
+            link = await self._get_attribute(card, '.base-card__full-link', 'href')
+
+            if not title or title == "N/A":
+                return None
+
+            return {
+                'title': self._clean_text(title),
+                'company': self._clean_text(company),
+                'location': self._clean_text(location_text),
+                'domain': self._extract_domain_from_title(title),
+                'duration': "Not specified",
+                'stipend': "Not specified",
+                'requirements': self._extract_skills_from_text(title),
+                'preferred_skills': [],
+                'description': "Click to view details on LinkedIn",
+                'responsibilities': [],
+                'qualifications': [],
+                'experience_level': "entry-level",
+                'tags': ["linkedin", "real-time"],
+                'link': link,
+                'source': 'LinkedIn',
+                'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+        except Exception as e:
+            logger.error(f"Error extracting LinkedIn job data: {str(e)}")
+            return None
+
+    async def _extract_naukri_job_data(self, card):
+        """Extract job data from Naukri job card"""
+        try:
+            title = await self._get_inner_text(card, '.title')
+            company = await self._get_inner_text(card, '.comp-name')
+            location_text = await self._get_inner_text(card, '.locWdth')
+            summary = await self._get_inner_text(card, '.job-desc')
+            link = await self._get_attribute(card, '.title', 'href')
+
+            if not title or title == "N/A":
+                return None
+
+            if link and not link.startswith('http'):
+                link = f"https://www.naukri.com{link}"
+
+            # Extract experience if available
+            exp_elem = await card.query_selector('.expwdth')
+            experience = await exp_elem.inner_text() if exp_elem else "Fresher"
+
+            return {
+                'title': self._clean_text(title),
+                'company': self._clean_text(company),
+                'location': self._clean_text(location_text),
+                'domain': self._extract_domain_from_title(title),
+                'duration': "Not specified",
+                'stipend': "Not specified",
+                'requirements': self._extract_skills_from_text(summary),
+                'preferred_skills': [],
+                'description': self._truncate_text(summary, 200),
+                'responsibilities': [],
+                'qualifications': [experience] if experience else [],
+                'experience_level': "entry-level" if "fresher" in experience.lower() else "intermediate",
+                'tags': ["naukri", "real-time"],
+                'link': link,
+                'source': 'Naukri',
+                'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+        except Exception as e:
+            logger.error(f"Error extracting Naukri job data: {str(e)}")
+            return None
+
+    def _extract_domain_from_title(self, title: str) -> str:
+        """Extract domain from job title"""
+        title_lower = title.lower()
+        domain_keywords = {
+            'software': 'Software Development',
+            'web': 'Web Development',
+            'frontend': 'Frontend Development',
+            'backend': 'Backend Development',
+            'data': 'Data Science',
+            'machine learning': 'Machine Learning',
+            'ai': 'Artificial Intelligence',
+            'mobile': 'Mobile Development',
+            'android': 'Mobile Development',
+            'ios': 'Mobile Development',
+            'cyber': 'Cybersecurity',
+            'security': 'Cybersecurity',
+            'cloud': 'Cloud Computing',
+            'devops': 'DevOps',
+            'marketing': 'Digital Marketing',
+            'finance': 'Finance',
+            'hr': 'Human Resources',
+            'design': 'Design',
+            'ui': 'UI/UX Design',
+            'ux': 'UI/UX Design'
+        }
+        
+        for keyword, domain in domain_keywords.items():
+            if keyword in title_lower:
+                return domain
+        return 'Technology'
+
+    def _extract_skills_from_text(self, text: str) -> List[str]:
+        """Extract skills from job description text"""
+        if not text or text == "N/A":
+            return []
+        
+        text_lower = text.lower()
+        common_skills = [
+            'python', 'java', 'javascript', 'react', 'node.js', 'html', 'css',
+            'sql', 'mongodb', 'postgresql', 'git', 'docker', 'kubernetes',
+            'aws', 'azure', 'machine learning', 'data analysis', 'excel',
+            'tableau', 'powerbi', 'figma', 'photoshop', 'communication',
+            'teamwork', 'problem solving', 'analytical thinking'
+        ]
+        
+        found_skills = []
+        for skill in common_skills:
+            if skill in text_lower:
+                found_skills.append(skill.title())
+        
+        return found_skills[:5]  # Return top 5 skills
+
+    def _clean_text(self, text):
+        """Helper method to clean text"""
+        if not text:
+            return "N/A"
+        return text.strip()
+
+    def _truncate_text(self, text, length):
+        """Helper method to truncate text"""
+        clean_text = self._clean_text(text)
+        return f"{clean_text[:length]}..." if len(clean_text) > length else clean_text
+
+# Initialize scraper
+scraper = InternshipScraper()
+
+# Background task manager
+class BackgroundTaskManager:
+    def __init__(self):
+        self.executor = ThreadPoolExecutor(max_workers=2)
+        self.running_tasks = {}
+
+    def run_scraping_task(self, task_id: str, sources: List[str], keyword: str, location: str, max_pages: int):
+        """Run scraping task in background"""
+        future = self.executor.submit(self._async_scraping_wrapper, sources, keyword, location, max_pages)
+        self.running_tasks[task_id] = {'future': future, 'status': 'running'}
+        return task_id
+
+    def _async_scraping_wrapper(self, sources: List[str], keyword: str, location: str, max_pages: int):
+        """Wrapper to run async scraping in thread"""
+        return asyncio.run(self._scrape_all_sources(sources, keyword, location, max_pages))
+
+    async def _scrape_all_sources(self, sources: List[str], keyword: str, location: str, max_pages: int):
+        """Scrape from all specified sources"""
+        all_internships = []
+        
+        if 'indeed' in sources:
+            try:
+                indeed_results = await scraper.scrape_indeed(keyword, location, max_pages)
+                all_internships.extend(indeed_results)
+                logger.info(f"Indeed scraped: {len(indeed_results)} jobs")
+            except Exception as e:
+                logger.error(f"Indeed scraping failed: {e}")
+
+        if 'linkedin' in sources:
+            try:
+                linkedin_results = await scraper.scrape_linkedin(keyword, location, max_pages)
+                all_internships.extend(linkedin_results)
+                logger.info(f"LinkedIn scraped: {len(linkedin_results)} jobs")
+            except Exception as e:
+                logger.error(f"LinkedIn scraping failed: {e}")
+
+        if 'naukri' in sources:
+            try:
+                naukri_results = await scraper.scrape_naukri(keyword, location, max_pages)
+                all_internships.extend(naukri_results)
+                logger.info(f"Naukri scraped: {len(naukri_results)} jobs")
+            except Exception as e:
+                logger.error(f"Naukri scraping failed: {e}")
+
+        # Save scraped internships
+        saved_count = scraper.save_internships(all_internships)
+        
+        return {
+            'success': True,
+            'internships_scraped': len(all_internships),
+            'internships_saved': saved_count,
+            'sources': sources
+        }
+
+    def get_task_status(self, task_id: str):
+        """Get status of a background task"""
+        if task_id not in self.running_tasks:
+            return {'status': 'not_found'}
+        
+        task = self.running_tasks[task_id]
+        future = task['future']
+        
+        if future.done():
+            try:
+                result = future.result()
+                task['status'] = 'completed'
+                task['result'] = result
+                return {'status': 'completed', 'result': result}
+            except Exception as e:
+                task['status'] = 'failed'
+                task['error'] = str(e)
+                return {'status': 'failed', 'error': str(e)}
+        else:
+            return {'status': 'running'}
+
+# Initialize background task manager
+task_manager = BackgroundTaskManager()
+
+# Django Views
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def scrape_internships(request):
+    """API endpoint to scrape internships"""
+    try:
+        data = request.data
+        keyword = data.get('keyword', 'internship')
+        location = data.get('location', 'India')
+        sources = data.get('sources', ['indeed'])
+        max_pages = min(int(data.get('max_pages', 2)), 5)  # Limit to 5 pages max
+        background = data.get('background', False)
+
+        if background:
+            # Run in background
+            task_id = f"scrape_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{random.randint(1000, 9999)}"
+            task_manager.run_scraping_task(task_id, sources, keyword, location, max_pages)
+            
+            return Response({
+                'success': True,
+                'message': 'Scraping started in background',
+                'task_id': task_id
+            })
+        else:
+            # Run synchronously
+            async def scrape_sync():
+                all_internships = []
+
+                if 'indeed' in sources:
+                    try:
+                        indeed_results = await scraper.scrape_indeed(keyword, location, max_pages)
+                        all_internships.extend(indeed_results)
+                        logger.info(f"Indeed scraped: {len(indeed_results)} jobs")
+                    except Exception as e:
+                        logger.error(f"Indeed scraping failed: {e}")
+
+                if 'linkedin' in sources:
+                    try:
+                        linkedin_results = await scraper.scrape_linkedin(keyword, location, max_pages)
+                        all_internships.extend(linkedin_results)
+                        logger.info(f"LinkedIn scraped: {len(linkedin_results)} jobs")
+                    except Exception as e:
+                        logger.error(f"LinkedIn scraping failed: {e}")
+
+                if 'naukri' in sources:
+                    try:
+                        naukri_results = await scraper.scrape_naukri(keyword, location, max_pages)
+                        all_internships.extend(naukri_results)
+                        logger.info(f"Naukri scraped: {len(naukri_results)} jobs")
+                    except Exception as e:
+                        logger.error(f"Naukri scraping failed: {e}")
+
+                # Save scraped internships
+                saved_count = scraper.save_internships(all_internships)
+
+                return {
+                    'success': True,
+                    'internships_scraped': len(all_internships),
+                    'internships_saved': saved_count,
+                    'internships': all_internships
+                }
+
+            # Run async function in current thread
+            result = asyncio.run(scrape_sync())
+            return Response(result)
+
+    except Exception as e:
+        logger.error(f"Error in scrape_internships: {str(e)}")
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_scraping_task_status(request, task_id):
+    """Get status of a scraping task"""
+    try:
+        task_status = task_manager.get_task_status(task_id)
+        return Response(task_status)
+    except Exception as e:
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def clean_expired_internships(request):
+    """Remove expired internships from the database"""
+    try:
+        # Load existing data
+        existing_data = scraper.load_existing_internships()
+        existing_internships = existing_data.get("internships", [])
+        
+        # Filter out expired internships
+        current_date = datetime.now()
+        active_internships = []
+        expired_count = 0
+        
+        for internship in existing_internships:
+            deadline_str = internship.get('application_deadline')
+            if deadline_str:
+                try:
+                    deadline = datetime.strptime(deadline_str, '%Y-%m-%d')
+                    if deadline >= current_date:
+                        active_internships.append(internship)
+                    else:
+                        expired_count += 1
+                except ValueError:
+                    # Keep internships with invalid date formats
+                    active_internships.append(internship)
+            else:
+                # Keep internships without deadlines
+                active_internships.append(internship)
+        
+        # Save cleaned data
+        cleaned_data = {"internships": active_internships}
+        with open(scraper.data_file_path, 'w', encoding='utf-8') as f:
+            json.dump(cleaned_data, f, indent=2, ensure_ascii=False)
+        
+        return Response({
+            'success': True,
+            'message': f'Removed {expired_count} expired internships',
+            'active_internships': len(active_internships),
+            'removed_count': expired_count
+        })
+        
+    except Exception as e:
+        logger.error(f"Error cleaning expired internships: {str(e)}")
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_scraping_stats(request):
+    """Get statistics about scraped internships"""
+    try:
+        data = scraper.load_existing_internships()
+        internships = data.get("internships", [])
+        
+        # Calculate statistics
+        total_internships = len(internships)
+        sources = {}
+        domains = {}
+        experience_levels = {}
+        recent_scrapes = 0
+        
+        current_date = datetime.now()
+        for internship in internships:
+            # Count by source
+            source = internship.get('source', 'Unknown')
+            sources[source] = sources.get(source, 0) + 1
+            
+            # Count by domain
+            domain = internship.get('domain', 'Unknown')
+            domains[domain] = domains.get(domain, 0) + 1
+            
+            # Count by experience level
+            exp_level = internship.get('experience_level', 'Unknown')
+            experience_levels[exp_level] = experience_levels.get(exp_level, 0) + 1
+            
+            # Count recent scrapes (last 24 hours)
+            scraped_at = internship.get('scraped_at')
+            if scraped_at:
+                try:
+                    scraped_date = datetime.strptime(scraped_at, '%Y-%m-%d %H:%M:%S')
+                    if (current_date - scraped_date).days < 1:
+                        recent_scrapes += 1
+                except ValueError:
+                    pass
+        
+        return Response({
+            'success': True,
+            'statistics': {
+                'total_internships': total_internships,
+                'recent_scrapes_24h': recent_scrapes,
+                'sources': sources,
+                'domains': domains,
+                'experience_levels': experience_levels
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting scraping stats: {str(e)}")
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def health_check(request):
+    """Health check endpoint"""
+    return Response({
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat(),
+        'scraper_ready': True
+    })
