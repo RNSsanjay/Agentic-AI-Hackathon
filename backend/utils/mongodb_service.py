@@ -639,3 +639,6 @@ class MongoDBService:
                 'total_gaps_detected': 0,
                 'last_analysis_date': None
             }
+
+# Create global instance
+mongodb_service = MongoDBService()

@@ -24,9 +24,7 @@ const AnalysisHistory = () => {
     useEffect(() => {
         fetchAnalysisHistory();
         fetchStatistics();
-    }, [currentPage, searchTerm, filterType]);
-
-    const fetchAnalysisHistory = async () => {
+    }, [currentPage, searchTerm, filterType]); const fetchAnalysisHistory = async () => {
         try {
             setLoading(true);
             const skip = (currentPage - 1) * analysesPerPage;
@@ -40,14 +38,40 @@ const AnalysisHistory = () => {
             const response = await axios.get(url);
 
             if (response.data.status === 'success') {
-                setAnalyses(response.data.analyses);
-                setStatistics(response.data.statistics);
+                const analyses = response.data.analyses || [];
+                const stats = response.data.statistics || {};
+
+                setAnalyses(analyses);
+                setStatistics(stats);
+
+                // Show informative message if no real data
+                if (analyses.length === 0 && response.data.using_mongodb === false) {
+                    console.log('No analyses found - using empty state');
+                } else if (analyses.length > 0) {
+                    console.log(`Loaded ${analyses.length} analyses`);
+                }
             } else {
-                toast.error('Failed to fetch analysis history');
+                console.warn('Analysis history response:', response.data);
+                setAnalyses([]);
+                setStatistics({});
+
+                // Only show error toast if it's an actual error, not just empty data
+                if (response.data.status === 'error') {
+                    toast.error(response.data.error || 'Failed to fetch analysis history');
+                }
             }
         } catch (error) {
             console.error('Error fetching analysis history:', error);
-            toast.error('Failed to load analysis history');
+            setAnalyses([]);
+            setStatistics({});
+
+            // Only show error for connectivity issues
+            if (error.response?.status === 500 || error.code === 'NETWORK_ERROR' || error.code === 'ECONNREFUSED') {
+                toast.error('Unable to connect to server. Please check your connection.');
+            } else if (error.response?.status !== 404) {
+                // Don't show error for 404 (not found), but show for other HTTP errors
+                toast.error('Failed to load analysis history');
+            }
         } finally {
             setLoading(false);
         }
@@ -96,9 +120,7 @@ const AnalysisHistory = () => {
             console.error('Error deleting analysis:', error);
             toast.error('Failed to delete analysis');
         }
-    };
-
-    const exportAnalysis = (analysis) => {
+    }; const exportAnalysis = (analysis) => {
         const dataStr = JSON.stringify(analysis, null, 2);
         const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
         const exportFileDefaultName = `analysis_${analysis.analysis_id}_${new Date(analysis.timestamp).toISOString().split('T')[0]}.json`;
@@ -106,7 +128,8 @@ const AnalysisHistory = () => {
         const linkElement = document.createElement('a');
         linkElement.setAttribute('href', dataUri);
         linkElement.setAttribute('download', exportFileDefaultName);
-        linkElement.click(); toast.success('Analysis exported successfully');
+        linkElement.click();
+        toast.success('Analysis exported successfully');
     };
 
     const getScoreColor = (score) => {
@@ -129,7 +152,21 @@ const AnalysisHistory = () => {
         return true;
     });
 
-    const totalPages = Math.ceil(filteredAnalyses.length / analysesPerPage); return (
+    const totalPages = Math.ceil(filteredAnalyses.length / analysesPerPage);
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 flex items-center justify-center">
+                <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full"
+                />
+            </div>
+        );
+    }
+
+    return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 relative overflow-hidden">
             {/* Floating animated elements */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -160,11 +197,10 @@ const AnalysisHistory = () => {
                     animate={{ opacity: 1, y: 0 }}
                     className="mb-8"
                 >                    <div className="flex items-center justify-between mb-6">
-                        <div>
-                            <h1 className="text-4xl font-bold text-gray-800 mb-2 bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
-                                Analysis History
-                            </h1>
-                            <p className="text-gray-600 font-medium">Track your resume analysis journey and improvements</p>
+                        <div>                            <h1 className="text-4xl font-bold text-blue-800 mb-2 bg-gradient-to-r from-blue-600 to-purple-800 bg-clip-text text-transparent">
+                            Analysis History
+                        </h1>
+                            <p className="text-blue-600 font-medium">Track your resume analysis journey and improvements</p>
                         </div>
                         <motion.button
                             onClick={() => window.history.back()}
@@ -175,7 +211,7 @@ const AnalysisHistory = () => {
                             <ChevronLeft className="w-4 h-4 mr-2" />
                             Back
                         </motion.button>
-                    </div>                    {/* Statistics Cards */}
+                    </div>{/* Statistics Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                         <motion.div
                             initial={{ opacity: 0, scale: 0.9 }}
@@ -184,9 +220,8 @@ const AnalysisHistory = () => {
                             className="bg-white/80 backdrop-blur-sm border border-blue-200 rounded-2xl p-6 hover:bg-white hover:shadow-xl transition-all duration-300"
                         >
                             <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-gray-600 text-sm font-semibold uppercase tracking-wider">Total Analyses</p>
-                                    <p className="text-3xl font-bold text-gray-800">{statistics.total_analyses || 0}</p>
+                                <div>                                    <p className="text-blue-600 text-sm font-semibold uppercase tracking-wider">Total Analyses</p>
+                                    <p className="text-3xl font-bold text-blue-800">{statistics.total_analyses || 0}</p>
                                 </div>
                                 <BarChart3 className="w-8 h-8 text-blue-600" />
                             </div>
@@ -200,7 +235,7 @@ const AnalysisHistory = () => {
                         >
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-gray-600 text-sm font-semibold uppercase tracking-wider">Avg. Readiness Score</p>
+                                    <p className="text-emerald-600 text-sm font-semibold uppercase tracking-wider">Avg. Readiness Score</p>
                                     <p className={`text-3xl font-bold ${getScoreColor(statistics.avg_readiness_score || 0)}`}>
                                         {statistics.avg_readiness_score || 0}%
                                     </p>
@@ -216,9 +251,8 @@ const AnalysisHistory = () => {
                             className="bg-white/80 backdrop-blur-sm border border-blue-200 rounded-2xl p-6 hover:bg-white hover:shadow-xl transition-all duration-300"
                         >
                             <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-gray-600 text-sm font-semibold uppercase tracking-wider">Total Internships Matched</p>
-                                    <p className="text-3xl font-bold text-gray-800">{statistics.total_internships_matched || 0}</p>
+                                <div>                                    <p className="text-purple-600 text-sm font-semibold uppercase tracking-wider">Total Internships Matched</p>
+                                    <p className="text-3xl font-bold text-purple-800">{statistics.total_internships_matched || 0}</p>
                                 </div>
                                 <Target className="w-8 h-8 text-purple-600" />
                             </div>
@@ -231,9 +265,8 @@ const AnalysisHistory = () => {
                             className="bg-white/80 backdrop-blur-sm border border-blue-200 rounded-2xl p-6 hover:bg-white hover:shadow-xl transition-all duration-300"
                         >
                             <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-gray-600 text-sm font-semibold uppercase tracking-wider">GitHub Analyses</p>
-                                    <p className="text-3xl font-bold text-gray-800">{statistics.has_github_analyses || 0}</p>
+                                <div>                                    <p className="text-orange-600 text-sm font-semibold uppercase tracking-wider">GitHub Analyses</p>
+                                    <p className="text-3xl font-bold text-orange-800">{statistics.has_github_analyses || 0}</p>
                                 </div>
                                 <Github className="w-8 h-8 text-orange-600" />
                             </div>
@@ -248,13 +281,13 @@ const AnalysisHistory = () => {
                 >
                     <div className="flex flex-col md:flex-row gap-4">
                         <div className="flex-1 relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-5 h-5" />
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-500 w-5 h-5" />
                             <input
                                 type="text"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 placeholder="Search by student name, skills, or summary..."
-                                className="w-full pl-10 pr-4 py-3 bg-white/80 border border-gray-300 rounded-xl text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
+                                className="w-full pl-10 pr-4 py-3 bg-white/80 border border-blue-300 rounded-xl text-blue-800 placeholder-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
                             />
                         </div>
 
@@ -265,7 +298,7 @@ const AnalysisHistory = () => {
                                 whileTap={{ scale: 0.98 }}
                                 className={`flex items-center px-6 py-3 rounded-xl border-2 transition-all font-medium ${showFilters
                                     ? 'bg-blue-600 border-blue-600 text-white shadow-lg'
-                                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                                    : 'bg-white border-blue-300 text-blue-700 hover:bg-blue-50'
                                     }`}
                             >
                                 <Filter className="w-4 h-4 mr-2" />
@@ -276,7 +309,7 @@ const AnalysisHistory = () => {
                                 onClick={fetchAnalysisHistory}
                                 whileHover={{ scale: 1.02, y: -1 }}
                                 whileTap={{ scale: 0.98 }}
-                                className="flex items-center px-6 py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium"
+                                className="flex items-center px-6 py-3 bg-white border-2 border-blue-300 text-blue-700 rounded-xl hover:bg-blue-50 transition-all font-medium"
                             >
                                 <RefreshCw className="w-4 h-4 mr-2" />
                                 Refresh
@@ -289,7 +322,7 @@ const AnalysisHistory = () => {
                                 initial={{ opacity: 0, height: 0 }}
                                 animate={{ opacity: 1, height: 'auto' }}
                                 exit={{ opacity: 0, height: 0 }}
-                                className="mt-6 pt-6 border-t border-gray-200"
+                                className="mt-6 pt-6 border-t border-blue-200"
                             >
                                 <div className="flex flex-wrap gap-3">
                                     {[
@@ -308,7 +341,7 @@ const AnalysisHistory = () => {
                                                 whileTap={{ scale: 0.98 }}
                                                 className={`flex items-center px-4 py-2 rounded-xl text-sm transition-all font-medium border-2 ${filterType === filter.value
                                                     ? 'bg-blue-600 text-white border-blue-600 shadow-lg'
-                                                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                                                    : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-50 hover:border-blue-300'
                                                     }`}
                                             >
                                                 <IconComponent className="w-4 h-4 mr-2" />
@@ -332,16 +365,25 @@ const AnalysisHistory = () => {
                     {loading ? (
                         <div className="flex items-center justify-center py-12">
                             <RefreshCw className="w-8 h-8 text-blue-400 animate-spin" />
-                            <span className="ml-2 text-gray-400">Loading analysis history...</span>
+                            <span className="ml-2 text-blue-400">Loading analysis history...</span>
                         </div>
-                    ) : filteredAnalyses.length === 0 ? (
-                        <div className="text-center py-12">
-                            <FileText className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                            <h3 className="text-xl font-semibold text-gray-400 mb-2">No analyses found</h3>
-                            <p className="text-gray-500">
-                                {searchTerm ? 'Try different search terms' : 'Start by analyzing your first resume!'}
-                            </p>
-                        </div>
+                    ) : filteredAnalyses.length === 0 ? (<div className="text-center py-12">
+                        <FileText className="w-16 h-16 text-blue-600 mx-auto mb-4" />
+                        <h3 className="text-xl font-semibold text-blue-400 mb-2">No analyses found</h3>
+                        <p className="text-blue-500 mb-4">
+                            {searchTerm ? 'Try different search terms or clear your search' : 'Upload your DOCX resume to get started with AI-powered analysis and internship recommendations!'}
+                        </p>
+                        {!searchTerm && (
+                            <motion.button
+                                onClick={() => window.location.href = '/'}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:shadow-lg transition-all font-medium"
+                            >
+                                Upload Resume Now
+                            </motion.button>
+                        )}
+                    </div>
                     ) : (
                         filteredAnalyses.map((analysis, index) => (
                             <AnalysisCard
@@ -363,23 +405,20 @@ const AnalysisHistory = () => {
                         animate={{ opacity: 1 }}
                         transition={{ delay: 0.4 }}
                         className="flex items-center justify-center space-x-2 mt-8"
+                    >                        <button
+                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                        disabled={currentPage === 1}
+                        className="flex items-center px-3 py-2 bg-blue-800 border border-blue-700 text-blue-300 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        <button
-                            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                            disabled={currentPage === 1}
-                            className="flex items-center px-3 py-2 bg-gray-800 border border-gray-700 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
                             <ChevronLeft className="w-4 h-4" />
                         </button>
 
-                        <span className="text-gray-400">
+                        <span className="text-blue-400">
                             Page {currentPage} of {totalPages}
-                        </span>
-
-                        <button
+                        </span>                        <button
                             onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                             disabled={currentPage === totalPages}
-                            className="flex items-center px-3 py-2 bg-gray-800 border border-gray-700 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex items-center px-3 py-2 bg-blue-800 border border-blue-700 text-blue-300 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <ChevronRight className="w-4 h-4" />
                         </button>
@@ -406,7 +445,9 @@ const AnalysisCard = ({ analysis, index, onView, onDelete, onExport }) => {
             hour: '2-digit',
             minute: '2-digit'
         });
-    }; const getScoreColor = (score) => {
+    };
+
+    const getScoreColor = (score) => {
         if (score >= 80) return 'text-green-600';
         if (score >= 60) return 'text-amber-600';
         return 'text-red-600';
@@ -432,69 +473,77 @@ const AnalysisCard = ({ analysis, index, onView, onDelete, onExport }) => {
                         <div className="flex items-center space-x-2">
                             <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                                 <User className="w-5 h-5 text-blue-600" />
-                            </div>
-                            <h3 className="text-lg font-bold text-gray-800">{analysis.student_name}</h3>
+                            </div>                            <h3 className="text-lg font-bold text-blue-800">
+                                {analysis.student_profile?.name || 'Anonymous User'}
+                            </h3>
                         </div>
 
-                        {analysis.github_username && (
+                        {analysis.github_analysis?.username && (
                             <div className="flex items-center space-x-2 bg-orange-100 px-3 py-1 rounded-full">
                                 <Github className="w-4 h-4 text-orange-600" />
-                                <span className="text-sm font-medium text-orange-700">{analysis.github_username}</span>
+                                <span className="text-sm font-medium text-orange-700">
+                                    {analysis.github_analysis.username}
+                                </span>
                             </div>
                         )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <div className="flex items-center space-x-2">
-                            <div className={`px-4 py-2 rounded-xl border-2 text-sm font-bold ${getScoreBadgeColor(analysis.overall_readiness_score)}`}>
-                                {analysis.overall_readiness_score}% Ready
+                            <div className={`px-4 py-2 rounded-xl border-2 text-sm font-bold ${getScoreBadgeColor(analysis.overall_readiness_score || 0)}`}>
+                                {analysis.overall_readiness_score || 0}% Ready
                             </div>
-                        </div>
-
-                        <div className="flex items-center space-x-2 text-gray-600">
+                        </div>                        <div className="flex items-center space-x-2 text-purple-600">
                             <Target className="w-4 h-4" />
-                            <span className="text-sm font-medium">{analysis.total_internships_matched} matches</span>
+                            <span className="text-sm font-medium">
+                                {analysis.internship_recommendations?.length || 0} matches
+                            </span>
                         </div>
 
-                        <div className="flex items-center space-x-2 text-gray-600">
+                        <div className="flex items-center space-x-2 text-orange-600">
                             <AlertCircle className="w-4 h-4" />
-                            <span className="text-sm font-medium">{analysis.total_gaps_detected} gaps</span>
+                            <span className="text-sm font-medium">
+                                {analysis.portfolio_gaps?.length || 0} gaps
+                            </span>
                         </div>
                     </div>
 
                     <div className="flex items-center space-x-4 mb-4">
-                        <div className="flex items-center space-x-2 text-gray-600">
+                        <div className="flex items-center space-x-2 text-blue-600">
                             <Calendar className="w-4 h-4" />
                             <span className="text-sm font-medium">{formatDate(analysis.timestamp)}</span>
                         </div>
 
-                        <div className="text-sm text-gray-600">
-                            Level: <span className="text-blue-600 capitalize font-semibold">{analysis.experience_level}</span>
+                        <div className="text-sm text-blue-600">
+                            Level: <span className="text-purple-600 capitalize font-semibold">
+                                {analysis.student_profile?.experience_level || 'N/A'}
+                            </span>
                         </div>
                     </div>
 
-                    {analysis.primary_skills.length > 0 && (
+                    {analysis.student_profile?.skills && analysis.student_profile.skills.length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-4">
-                            {analysis.primary_skills.slice(0, 5).map((skill, skillIndex) => (
+                            {analysis.student_profile.skills.slice(0, 5).map((skill, skillIndex) => (
                                 <span
                                     key={skillIndex}
-                                    className="px-3 py-1 bg-blue-100 text-blue-700 text-xs rounded-full border border-blue-200 font-medium"
+                                    className="px-3 py-1 bg-blue-50 text-blue-700 text-xs rounded-full border border-blue-200 font-medium"
                                 >
                                     {skill}
                                 </span>
                             ))}
-                            {analysis.primary_skills.length > 5 && (
-                                <span className="px-3 py-1 bg-gray-100 text-gray-600 text-xs rounded-full border border-gray-200">
-                                    +{analysis.primary_skills.length - 5} more
-                                </span>
+                            {analysis.student_profile.skills.length > 5 && (<span className="px-3 py-1 bg-blue-100 text-blue-600 text-xs rounded-full border border-blue-200 font-medium">
+                                +{analysis.student_profile.skills.length - 5} more
+                            </span>
                             )}
                         </div>
                     )}
 
                     {analysis.analysis_summary && (
-                        <p className="text-gray-600 text-sm mb-4 font-medium">{analysis.analysis_summary}</p>
+                        <p className="text-blue-600 text-sm mb-4 font-medium">{analysis.analysis_summary}</p>
                     )}
-                </div>                <div className="flex items-center space-x-3 ml-4">
+                </div>
+
+                <div className="flex items-center space-x-3 ml-4">
                     <motion.button
                         onClick={onView}
                         whileHover={{ scale: 1.05, y: -1 }}
@@ -503,13 +552,11 @@ const AnalysisCard = ({ analysis, index, onView, onDelete, onExport }) => {
                     >
                         <Eye className="w-4 h-4 mr-2" />
                         View
-                    </motion.button>
-
-                    <motion.button
+                    </motion.button>                    <motion.button
                         onClick={onExport}
                         whileHover={{ scale: 1.05, y: -1 }}
                         whileTap={{ scale: 0.95 }}
-                        className="flex items-center px-4 py-2 bg-white border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium"
+                        className="flex items-center px-4 py-2 bg-white border-2 border-blue-300 text-blue-700 rounded-xl hover:bg-blue-50 transition-all font-medium"
                     >
                         <Download className="w-4 h-4 mr-2" />
                         Export
@@ -557,163 +604,151 @@ const AnalysisDetailsModal = ({ analysis, onClose }) => {
                 exit={{ opacity: 0, scale: 0.9, y: 20 }}
                 className="bg-white border border-blue-200 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl"
                 onClick={(e) => e.stopPropagation()}
-            >
-                    <div className="p-6 border-b border-blue-200 bg-gradient-to-r from-blue-50 to-blue-100">
+            >                    <div className="p-6 border-b border-blue-200 bg-gradient-to-r from-blue-50 to-purple-100">
                         <div className="flex items-center justify-between">
-                            <h2 className="text-2xl font-bold text-gray-800">Analysis Details</h2>
+                            <h2 className="text-2xl font-bold text-blue-800">Analysis Details</h2>
                             <motion.button
                                 onClick={onClose}
                                 whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.9 }}
-                                className="text-gray-500 hover:text-gray-700 transition-colors text-xl"
+                                className="text-blue-500 hover:text-blue-700 transition-colors text-xl"
                             >
                                 ✕
                             </motion.button>
                         </div>
-                        <p className="text-gray-600 mt-1 font-medium">
+                        <p className="text-blue-600 mt-1 font-medium">
                             Analysis from {formatDate(analysis.timestamp)}
                         </p>
                     </div>
 
                     <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-                        {/* Student Profile Section */}
-                        <div className="mb-8">
-                            <h3 className="text-xl font-bold text-gray-800 mb-4">Student Profile</h3>
-                            <div className="bg-blue-50 rounded-xl p-6 border border-blue-200">
+                        {/* Student Profile Section */}                        <div className="mb-8">
+                            <h3 className="text-xl font-bold text-blue-800 mb-4">Student Profile</h3>
+                            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                     <div>
-                                        <p className="text-gray-600 text-sm font-semibold">Name</p>
-                                        <p className="text-gray-800 font-medium">{analysis.student_profile?.name || 'N/A'}</p>
+                                        <p className="text-blue-600 text-sm font-semibold">Name</p>
+                                        <p className="text-blue-800 font-medium">{analysis.student_profile?.name || 'N/A'}</p>
                                     </div>
                                     <div>
-                                        <p className="text-gray-600 text-sm font-semibold">Experience Level</p>
-                                        <p className="text-gray-800 capitalize font-medium">{analysis.student_profile?.experience_level || 'N/A'}</p>
+                                        <p className="text-blue-600 text-sm font-semibold">Experience Level</p>
+                                        <p className="text-blue-800 capitalize font-medium">{analysis.student_profile?.experience_level || 'N/A'}</p>
                                     </div>
                                     <div>
-                                        <p className="text-gray-600 text-sm font-semibold">Email</p>
-                                        <p className="text-gray-800 font-medium">{analysis.student_profile?.email || 'N/A'}</p>
+                                        <p className="text-blue-600 text-sm font-semibold">Email</p>
+                                        <p className="text-blue-800 font-medium">{analysis.student_profile?.email || 'N/A'}</p>
                                     </div>
                                     <div>
-                                        <p className="text-gray-600 text-sm font-semibold">Overall Readiness</p>
-                                        <p className="text-blue-600 font-bold text-lg">{analysis.overall_readiness_score}%</p>
+                                        <p className="text-blue-600 text-sm font-semibold">Overall Readiness</p>
+                                        <p className="text-purple-600 font-bold text-lg">{analysis.overall_readiness_score}%</p>
                                     </div>
-                                </div>
-
-                                {analysis.student_profile?.skills && (
+                                </div>                                {analysis.student_profile?.skills && (
                                     <div className="mb-4">
-                                        <p className="text-gray-400 text-sm mb-2">Skills</p>
+                                        <p className="text-blue-600 text-sm mb-2 font-semibold">Skills</p>
                                         <div className="flex flex-wrap gap-2">
                                             {analysis.student_profile.skills.map((skill, index) => (
                                                 <span
                                                     key={index}
-                                                    className="px-2 py-1 bg-blue-900/30 text-blue-400 text-sm rounded border border-blue-500/30"
+                                                    className="px-3 py-1 bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700 text-sm rounded-full border border-blue-200 font-medium"
                                                 >
                                                     {skill}
                                                 </span>
                                             ))}
                                         </div>
                                     </div>
-                                )}
-
-                                {analysis.github_analysis && (
+                                )}                                {analysis.github_analysis && (
                                     <div>
-                                        <p className="text-gray-400 text-sm mb-2">GitHub Analysis</p>
+                                        <p className="text-blue-600 text-sm mb-2 font-semibold">GitHub Analysis</p>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                                             <div>
-                                                <p className="text-gray-500">Username</p>
-                                                <p className="text-white">{analysis.github_analysis.username}</p>
+                                                <p className="text-blue-500">Username</p>
+                                                <p className="text-blue-800 font-medium">{analysis.github_analysis.username}</p>
                                             </div>
                                             <div>
-                                                <p className="text-gray-500">Public Repos</p>
-                                                <p className="text-white">{analysis.github_analysis.public_repos}</p>
+                                                <p className="text-blue-500">Public Repos</p>
+                                                <p className="text-blue-800 font-medium">{analysis.github_analysis.public_repos}</p>
                                             </div>
                                             <div>
-                                                <p className="text-gray-500">GitHub Score</p>
-                                                <p className="text-white">{analysis.github_analysis.github_score}/100</p>
+                                                <p className="text-blue-500">GitHub Score</p>
+                                                <p className="text-blue-800 font-medium">{analysis.github_analysis.github_score}/100</p>
                                             </div>
                                         </div>
                                     </div>
                                 )}
                             </div>
-                        </div>
-
-                        {/* Internship Recommendations */}
+                        </div>                        {/* Internship Recommendations */}
                         {analysis.internship_recommendations && analysis.internship_recommendations.length > 0 && (
                             <div className="mb-8">
-                                <h3 className="text-xl font-semibold text-white mb-4">
+                                <h3 className="text-xl font-bold text-blue-800 mb-4">
                                     Internship Recommendations ({analysis.internship_recommendations.length})
                                 </h3>
                                 <div className="space-y-4">
                                     {analysis.internship_recommendations.slice(0, 3).map((internship, index) => (
-                                        <div key={index} className="bg-gray-800/50 rounded-lg p-4">
+                                        <div key={index} className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-4 hover:shadow-md transition-all">
                                             <div className="flex items-start justify-between mb-2">
-                                                <h4 className="font-semibold text-white">{internship.title}</h4>
-                                                <span className="text-green-400 text-sm font-medium">
+                                                <h4 className="font-bold text-blue-800">{internship.title}</h4>
+                                                <span className="text-emerald-600 text-sm font-bold bg-emerald-100 px-2 py-1 rounded-full">
                                                     {(internship.matching_score * 100).toFixed(0)}% match
                                                 </span>
                                             </div>
-                                            <p className="text-gray-400 text-sm mb-2">{internship.company} • {internship.location}</p>
+                                            <p className="text-purple-600 text-sm mb-2 font-medium">{internship.company} • {internship.location}</p>
                                             {internship.justification && (
-                                                <p className="text-gray-300 text-sm">{internship.justification}</p>
+                                                <p className="text-blue-700 text-sm font-medium">{internship.justification}</p>
                                             )}
                                         </div>
                                     ))}
                                     {analysis.internship_recommendations.length > 3 && (
-                                        <p className="text-gray-400 text-sm">
+                                        <p className="text-blue-600 text-sm font-medium">
                                             +{analysis.internship_recommendations.length - 3} more recommendations available
                                         </p>
                                     )}
                                 </div>
                             </div>
-                        )}
-
-                        {/* Portfolio Gaps */}
+                        )}                        {/* Portfolio Gaps */}
                         {analysis.portfolio_gaps && analysis.portfolio_gaps.length > 0 && (
                             <div className="mb-8">
-                                <h3 className="text-xl font-semibold text-white mb-4">
+                                <h3 className="text-xl font-bold text-blue-800 mb-4">
                                     Portfolio Gaps ({analysis.portfolio_gaps.length})
                                 </h3>
                                 <div className="space-y-3">
                                     {analysis.portfolio_gaps.slice(0, 5).map((gap, index) => (
-                                        <div key={index} className="bg-red-900/20 border border-red-500/30 rounded-lg p-3">
+                                        <div key={index} className="bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-xl p-4 hover:shadow-md transition-all">
                                             <div className="flex items-start justify-between">
-                                                <h4 className="text-red-400 font-medium">{gap.title}</h4>
-                                                <span className={`text-xs px-2 py-1 rounded ${gap.priority === 'high' ? 'bg-red-900/50 text-red-400' :
-                                                    gap.priority === 'medium' ? 'bg-yellow-900/50 text-yellow-400' :
-                                                        'bg-gray-800 text-gray-400'
+                                                <h4 className="text-red-600 font-bold">{gap.title}</h4>
+                                                <span className={`text-xs px-3 py-1 rounded-full font-bold ${gap.priority === 'high' ? 'bg-red-100 text-red-600 border border-red-200' :
+                                                    gap.priority === 'medium' ? 'bg-orange-100 text-orange-600 border border-orange-200' :
+                                                        'bg-blue-100 text-blue-600 border border-blue-200'
                                                     }`}>
                                                     {gap.priority}
                                                 </span>
                                             </div>
                                             {gap.description && (
-                                                <p className="text-gray-300 text-sm mt-1">{gap.description}</p>
+                                                <p className="text-orange-700 text-sm mt-2 font-medium">{gap.description}</p>
                                             )}
                                         </div>
                                     ))}
                                     {analysis.portfolio_gaps.length > 5 && (
-                                        <p className="text-gray-400 text-sm">
+                                        <p className="text-red-600 text-sm font-medium">
                                             +{analysis.portfolio_gaps.length - 5} more gaps identified
                                         </p>
                                     )}
                                 </div>
                             </div>
-                        )}
-
-                        {/* Readiness Evaluations */}
+                        )}                        {/* Readiness Evaluations */}
                         {analysis.readiness_evaluations && analysis.readiness_evaluations.length > 0 && (
                             <div>
-                                <h3 className="text-xl font-semibold text-white mb-4">Readiness Evaluations</h3>
+                                <h3 className="text-xl font-bold text-blue-800 mb-4">Readiness Evaluations</h3>
                                 <div className="space-y-4">
                                     {analysis.readiness_evaluations.map((evaluation, index) => (
-                                        <div key={index} className="bg-gray-800/50 rounded-lg p-4">
+                                        <div key={index} className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-xl p-4 hover:shadow-md transition-all">
                                             <div className="flex items-center justify-between mb-2">
-                                                <h4 className="font-semibold text-white">{evaluation.internship_title}</h4>
-                                                <span className="text-blue-400 font-semibold">
+                                                <h4 className="font-bold text-green-700">{evaluation.internship_title}</h4>
+                                                <span className="text-blue-600 font-bold text-lg bg-blue-100 px-3 py-1 rounded-full">
                                                     {(evaluation.readiness_score * 100).toFixed(0)}%
                                                 </span>
                                             </div>
                                             {evaluation.company && (
-                                                <p className="text-gray-400 text-sm">{evaluation.company}</p>
+                                                <p className="text-green-600 text-sm font-medium">{evaluation.company}</p>
                                             )}
                                         </div>
                                     ))}

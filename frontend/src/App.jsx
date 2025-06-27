@@ -1,7 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './pages/Login';
 import Signup from './pages/signup';
@@ -82,17 +81,21 @@ function App() {
             <Router>
                 <div className="App">
                     <AppRoutes />
-                    <ToastContainer
+                    <Toaster
                         position="top-right"
-                        autoClose={5000}
-                        hideProgressBar={false}
-                        newestOnTop={false}
-                        closeOnClick
-                        rtl={false}
-                        pauseOnFocusLoss
-                        draggable
-                        pauseOnHover
-                        theme="dark"
+                        toastOptions={{
+                            duration: 4000,
+                            style: {
+                                background: '#363636',
+                                color: '#fff',
+                            },
+                            success: {
+                                duration: 3000,
+                                theme: {
+                                    primary: '#4aed88',
+                                },
+                            },
+                        }}
                     />
                 </div>
             </Router>

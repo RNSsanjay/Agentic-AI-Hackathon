@@ -18,70 +18,32 @@ const AVAILABLE_DOMAINS = [
 
 const QUICK_ACTIONS = [
   {
-    title: 'AI Resume Analysis',
-    description: 'Get comprehensive AI-powered analysis of your resume with skill extraction and gap identification',
+    title: 'Resume Analysis',
+    description: 'AI-powered comprehensive resume analysis',
     icon: <Brain className="w-8 h-8" />,
     color: 'from-purple-600 to-blue-600',
-    bgColor: 'bg-gradient-to-br from-purple-50 to-blue-50',
-    iconBg: 'bg-gradient-to-br from-purple-500 to-blue-600',
-    features: ['Skill Extraction', 'ATS Optimization', 'Gap Analysis'],
-    stats: { accuracy: '98%', time: '< 60s', features: '15+' },
     onClick: () => document.getElementById('resume-upload')?.click()
   },
   {
-    title: 'Smart Matching',
-    description: 'AI-driven internship matching based on your skills, preferences, and career goals',
+    title: 'Smart Skill Mapping',
+    description: 'Automatic skill extraction and mapping',
     icon: <Target className="w-8 h-8" />,
     color: 'from-green-600 to-teal-600',
-    bgColor: 'bg-gradient-to-br from-green-50 to-teal-50',
-    iconBg: 'bg-gradient-to-br from-green-500 to-teal-600',
-    features: ['Skill Matching', 'Location Filter', 'Salary Range'],
-    stats: { matches: '500+', accuracy: '95%', domains: '20+' },
-    onClick: () => toast.info('Upload your resume first to enable smart matching!')
+    onClick: () => toast.info('Skill mapping included in resume analysis')
   },
   {
-    title: 'Portfolio Builder',
-    description: 'Create a stunning portfolio with AI recommendations and project suggestions',
+    title: 'Portfolio Intelligence',
+    description: 'AI-driven portfolio gap analysis',
     icon: <Award className="w-8 h-8" />,
     color: 'from-orange-600 to-red-600',
-    bgColor: 'bg-gradient-to-br from-orange-50 to-red-50',
-    iconBg: 'bg-gradient-to-br from-orange-500 to-red-600',
-    features: ['Project Ideas', 'Skill Showcase', 'GitHub Integration'],
-    stats: { templates: '25+', projects: '100+', tools: '15+' },
-    onClick: () => toast.info('Portfolio builder coming soon!')
+    onClick: () => toast.info('Portfolio analysis included in resume analysis')
   },
   {
-    title: 'Career Insights',
-    description: 'Get personalized career insights and industry trends based on your profile',
-    icon: <TrendingUp className="w-8 h-8" />,
-    color: 'from-indigo-600 to-purple-600',
-    bgColor: 'bg-gradient-to-br from-indigo-50 to-purple-50',
-    iconBg: 'bg-gradient-to-br from-indigo-500 to-purple-600',
-    features: ['Market Trends', 'Salary Insights', 'Growth Path'],
-    stats: { trends: 'Real-time', companies: '1000+', insights: '50+' },
-    onClick: () => toast.info('Career insights available after resume analysis!')
-  },
-  {
-    title: 'Interview Prep',
-    description: 'AI-powered interview preparation with domain-specific questions and feedback',
-    icon: <MessageSquare className="w-8 h-8" />,
-    color: 'from-cyan-600 to-blue-600',
-    bgColor: 'bg-gradient-to-br from-cyan-50 to-blue-50',
-    iconBg: 'bg-gradient-to-br from-cyan-500 to-blue-600',
-    features: ['Mock Interviews', 'AI Feedback', 'Question Bank'],
-    stats: { questions: '2000+', success: '85%', domains: '15+' },
-    onClick: () => toast.info('Interview prep coming soon!')
-  },
-  {
-    title: 'Skill Assessment',
-    description: 'Take comprehensive skill assessments and get certified in various technologies',
-    icon: <Code className="w-8 h-8" />,
-    color: 'from-violet-600 to-purple-600',
-    bgColor: 'bg-gradient-to-br from-violet-50 to-purple-50',
-    iconBg: 'bg-gradient-to-br from-violet-500 to-purple-600',
-    features: ['Skill Tests', 'Certifications', 'Progress Tracking'],
-    stats: { tests: '150+', skills: '30+', certificates: '25+' },
-    onClick: () => toast.info('Skill assessment coming soon!')
+    title: 'Readiness Score',
+    description: 'Comprehensive internship readiness evaluation',
+    icon: <CheckCircle className="w-8 h-8" />,
+    color: 'from-pink-600 to-purple-600',
+    onClick: () => toast.info('Readiness score included in resume analysis')
   }
 ];
 
@@ -213,24 +175,24 @@ const Home = () => {
       value: '0%',
       change: 'Upload resume to analyze',
       icon: <Star className="w-5 h-5" />,
-      color: 'text-gray-500',
-      bgColor: 'from-gray-100 to-gray-50'
+      color: 'text-blue-500',
+      bgColor: 'from-blue-100 to-blue-50'
     },
     {
       label: 'Internship Matches',
       value: '0',
       change: 'Upload resume to find matches',
       icon: <Target className="w-5 h-5" />,
-      color: 'text-gray-500',
-      bgColor: 'from-gray-100 to-gray-50'
+      color: 'text-purple-500',
+      bgColor: 'from-purple-100 to-purple-50'
     },
     {
       label: 'Gaps Detected',
       value: '0',
       change: 'Upload resume to detect gaps',
       icon: <AlertCircle className="w-5 h-5" />,
-      color: 'text-gray-500',
-      bgColor: 'from-gray-100 to-gray-50'
+      color: 'text-orange-500',
+      bgColor: 'from-orange-100 to-orange-50'
     },
     {
       label: 'Available Internships',
@@ -279,8 +241,8 @@ const Home = () => {
   const validateFile = (file) => {
     const errors = [];
     if (!file) errors.push('Please select a file');
-    if (file && !['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/pdf'].includes(file.type)) {
-      errors.push('File must be a DOC, DOCX or PDF document');
+    if (file && !['application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(file.type) && !file.name.toLowerCase().endsWith('.docx')) {
+      errors.push('File must be a DOCX document only');
     }
     if (file && file.size > 5 * 1024 * 1024) errors.push('File size must be less than 5MB');
     if (file && file.size < 1024) errors.push('File seems too small to be a valid resume');
@@ -471,7 +433,7 @@ const Home = () => {
       fallback: <AlertCircle className="w-4 h-4 text-yellow-400" />,
       warning: <AlertCircle className="w-4 h-4 text-yellow-400" />
     };
-    return icons[status] || <Clock className="w-4 h-4 text-gray-400" />;
+    return icons[status] || <Clock className="w-4 h-4 text-blue-400" />;
   };
 
   const getStatusColor = (status) => {
@@ -484,7 +446,7 @@ const Home = () => {
       fallback: 'text-yellow-400 bg-yellow-900/20 border-yellow-500/30',
       warning: 'text-yellow-400 bg-yellow-900/20 border-yellow-500/30'
     };
-    return colors[status] || 'text-gray-400 bg-gray-900/20 border-gray-500/30';
+    return colors[status] || 'text-blue-400 bg-blue-900/20 border-blue-500/30';
   };
 
   const groupCommunicationsByAgent = (communications) => {
@@ -530,7 +492,7 @@ const Home = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 text-gray-900 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 text-blue-900 relative overflow-hidden">
       {/* Floating animated elements - no rotation */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
@@ -570,7 +532,7 @@ const Home = () => {
           >
             <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full mx-auto mb-4 animate-spin" />
             <h2 className="text-xl font-semibold text-blue-600 mb-2">Loading InternAI Dashboard</h2>
-            <p className="text-gray-600">Fetching real-time internship data and GitHub integration...</p>
+            <p className="text-blue-600">Fetching real-time internship data and GitHub integration...</p>
           </motion.div>
         </div>
       ) : (
@@ -582,10 +544,6 @@ const Home = () => {
         >
           <WelcomeSection user={user} navigate={navigate} refreshDashboardToZero={refreshDashboardToZero} />
           <StatsSection stats={dashboardStatsData} />
-
-          {/* Dashboard Overview */}
-          {analysisResults && <DashboardOverview analysisResults={analysisResults} />}
-
           <div className="grid lg:grid-cols-4 gap-8">
             <MainContent
               analysisResults={analysisResults}
@@ -634,129 +592,41 @@ const Home = () => {
   );
 };
 
-const WelcomeSection = ({ user, navigate, refreshDashboardToZero }) => {
-  const currentHour = new Date().getHours();
-  const greeting = currentHour < 12 ? 'Good morning' : currentHour < 18 ? 'Good afternoon' : 'Good evening';
-
-  return (
-    <motion.div variants={itemVariants} className="mb-8">
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <motion.h2
-            className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 bg-clip-text text-transparent pb-4"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            {greeting}, {user?.first_name || 'Student'}!
-            <motion.span
-              className="ml-3 text-white"
-              animate={{
-                rotate: [0, 10, -10, 0],
-                scale: [1, 1.1, 1]
-              }}
-              transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-              role="img"
-              aria-label="robot"
-            >
-              🤖
-            </motion.span>
-          </motion.h2>
-          <motion.p
-            className="text-blue-600 text-lg font-medium mb-4"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            AI-powered resume analysis for intelligent internship matching.
-          </motion.p>
-
-          {/* Quick Stats */}
-          <motion.div
-            className="flex items-center space-x-6 text-sm text-gray-600"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-          >
-            <div className="flex items-center">
-              <Users className="w-4 h-4 mr-1 text-blue-500" />
-              <span className="font-medium">5,000+ students helped</span>
-            </div>
-            <div className="flex items-center">
-              <Briefcase className="w-4 h-4 mr-1 text-green-500" />
-              <span className="font-medium">95% match accuracy</span>
-            </div>
-            <div className="flex items-center">
-              <Clock className="w-4 h-4 mr-1 text-purple-500" />
-              <span className="font-medium">&lt; 60s analysis time</span>
-            </div>
-          </motion.div>
-        </div>
-
-        <motion.div
-          className="flex space-x-3"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <motion.button
-            onClick={() => navigate('/analysis-history')}
-            whileHover={{ scale: 1.05, y: -2 }}
-            whileTap={{ scale: 0.95 }}
-            className="flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-blue-500/25"
-          >
-            <Clock className="w-4 h-4 mr-2" />
-            View History
-          </motion.button>
-          <motion.button
-            onClick={refreshDashboardToZero}
-            whileHover={{ scale: 1.05, y: -2 }}
-            whileTap={{ scale: 0.95 }}
-            className="flex items-center px-6 py-3 bg-white/80 backdrop-blur-sm text-blue-600 border border-blue-200 rounded-xl hover:bg-white hover:shadow-lg transition-all"
-            title="Reset dashboard to zero state"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Reset Stats
-          </motion.button>
-        </motion.div>
+const WelcomeSection = ({ user, navigate, refreshDashboardToZero }) => (
+  <motion.div variants={itemVariants} className="mb-8">
+    <div className="flex items-center justify-between">
+      <div>
+        <h2 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 bg-clip-text text-transparent pb-4">
+          Welcome to InternAI, {user?.first_name || 'Student'}! <span className="ml-2 text-white" role="img" aria-label="robot"> 🤖 </span>
+        </h2>
+        <p className="text-blue-600 text-lg font-medium">
+          AI-powered resume analysis for intelligent internship matching.
+        </p>
       </div>
-
-      {/* Progress Indicators */}
-      <motion.div
-        className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.8 }}
-      >
-        {[
-          { label: 'Profile Completion', value: user?.email ? 75 : 25, color: 'blue' },
-          { label: 'Resume Status', value: 0, color: 'orange' },
-          { label: 'Matches Found', value: 0, color: 'green' },
-          { label: 'Applications', value: 0, color: 'purple' }
-        ].map((item, index) => (
-          <div key={index} className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-blue-100">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700">{item.label}</span>
-              <span className="text-sm font-bold text-gray-800">{item.value}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <motion.div
-                className={`h-2 rounded-full bg-gradient-to-r ${item.color === 'blue' ? 'from-blue-500 to-blue-600' :
-                    item.color === 'orange' ? 'from-orange-500 to-orange-600' :
-                      item.color === 'green' ? 'from-green-500 to-green-600' :
-                        'from-purple-500 to-purple-600'
-                  }`}
-                initial={{ width: 0 }}
-                animate={{ width: `${item.value}%` }}
-                transition={{ delay: 1 + index * 0.1, duration: 0.8 }}
-              />
-            </div>
-          </div>
-        ))}
-      </motion.div>
-    </motion.div>
-  );
-};
+      <div className="flex space-x-3">
+        <motion.button
+          onClick={() => navigate('/analysis-history')}
+          whileHover={{ scale: 1.05, y: -2 }}
+          whileTap={{ scale: 0.95 }}
+          className="flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-blue-500/25"
+        >
+          <Clock className="w-4 h-4 mr-2" />
+          View History
+        </motion.button>
+        <motion.button
+          onClick={refreshDashboardToZero}
+          whileHover={{ scale: 1.05, y: -2 }}
+          whileTap={{ scale: 0.95 }}
+          className="flex items-center px-6 py-3 bg-white/80 backdrop-blur-sm text-blue-600 border border-blue-200 rounded-xl hover:bg-white hover:shadow-lg transition-all"
+          title="Reset dashboard to zero state"
+        >
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Reset Stats
+        </motion.button>
+      </div>
+    </div>
+  </motion.div>
+);
 
 const StatsSection = ({ stats }) => (
   <motion.div
@@ -767,76 +637,24 @@ const StatsSection = ({ stats }) => (
       <motion.div
         key={index}
         whileHover={{ scale: 1.02, y: -4 }}
-        className="group bg-white/80 backdrop-blur-sm border border-blue-200 rounded-2xl p-6 hover:bg-white hover:shadow-xl hover:shadow-blue-100 transition-all duration-300 cursor-pointer"
+        className="bg-white/80 backdrop-blur-sm border border-blue-200 rounded-2xl p-6 hover:bg-white hover:shadow-xl hover:shadow-blue-100 transition-all duration-300"
       >
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider">{stat.label}</h3>
+          <h3 className="text-sm font-semibold text-blue-600 uppercase tracking-wider">{stat.label}</h3>
           <motion.div
-            className={`${stat.color} p-2 rounded-xl bg-gradient-to-br ${stat.bgColor || 'from-blue-100 to-blue-50'} shadow-sm group-hover:shadow-md transition-all`}
+            className={stat.color}
             animate={stat.value !== '0' && stat.value !== '0%' ? "pulse" : ""}
             variants={pulseVariants}
           >
             {stat.icon}
           </motion.div>
         </div>
-
-        <div className="flex items-end justify-between mb-2">
-          <motion.p
-            className="text-3xl font-bold text-gray-800"
-            initial={{ scale: 0.8 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: index * 0.1 }}
-          >
-            {stat.value}
-          </motion.p>
-
-          {/* Progress indicator for non-zero values */}
-          {stat.value !== '0' && stat.value !== '0%' && (
-            <motion.div
-              className="w-8 h-8 rounded-full bg-gradient-to-r from-green-400 to-green-500 flex items-center justify-center"
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: index * 0.1 + 0.3 }}
-            >
-              <CheckCircle className="w-4 h-4 text-white" />
-            </motion.div>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between">
-          <span className="text-blue-600 text-sm font-medium bg-blue-50 px-3 py-1 rounded-full">
+        <div className="flex items-end justify-between">
+          <p className="text-3xl font-bold text-blue-800">{stat.value}</p>
+          <span className="text-blue-600 text-sm font-medium bg-blue-50 px-2 py-1 rounded-full">
             {stat.change}
           </span>
-
-          {/* Trend indicator */}
-          {stat.value !== '0' && stat.value !== '0%' && (
-            <motion.div
-              className="flex items-center text-green-600"
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.1 + 0.5 }}
-            >
-              <TrendingUp className="w-4 h-4" />
-            </motion.div>
-          )}
         </div>
-
-        {/* Interactive hover effect */}
-        <motion.div
-          className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity"
-          whileHover={{ scale: 1.02 }}
-        >
-          <motion.div
-            className={`h-full bg-gradient-to-r ${stat.color === 'text-blue-600' ? 'from-blue-500 to-blue-600' :
-              stat.color === 'text-green-600' ? 'from-green-500 to-green-600' :
-                stat.color === 'text-orange-600' ? 'from-orange-500 to-orange-600' :
-                  stat.color === 'text-purple-600' ? 'from-purple-500 to-purple-600' :
-                    'from-gray-500 to-gray-600'}`}
-            initial={{ width: 0 }}
-            whileHover={{ width: stat.value !== '0' && stat.value !== '0%' ? '100%' : '25%' }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-          />
-        </motion.div>
       </motion.div>
     ))}
   </motion.div>
@@ -929,103 +747,99 @@ const UploadSection = ({
   retryAnalysis
 }) => {
   return (
-    <>
-      {/* Quick Actions Grid */}
-      <QuickActionsGrid quickActions={quickActions} />
+    <motion.div variants={itemVariants} className="mb-8">
+      <div className="bg-white/90 backdrop-blur-sm border border-blue-200 rounded-2xl p-8 shadow-xl hover:shadow-2xl transition-all duration-300">
+        <div className="text-center mb-8">
 
-      {/* Main Upload Section */}
-      <motion.div variants={itemVariants} className="mb-8">
-        <div className="bg-white/90 backdrop-blur-sm border border-blue-200 rounded-2xl p-8 shadow-xl hover:shadow-2xl transition-all duration-300">
-          <div className="text-center mb-8">
-            <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg mx-auto mb-4">
-              <Brain className="w-10 h-10 text-white" />
+          <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg ml-[400px] mb-4">
+            <Brain className="w-10 h-10 text-white" />
+          </div>
+
+          <h3 className="text-3xl font-bold mb-3 text-blue-800">AI-Powered Resume Analysis</h3>
+          <p className="text-blue-600 text-lg">
+            Upload your resume and select preferred domains for personalized internship matching.
+          </p>
+        </div>
+        <div className="space-y-8">
+          <DomainPreferences
+            selectedPreferences={selectedPreferences}
+            availableDomains={availableDomains}
+            handlePreferenceToggle={handlePreferenceToggle}
+          />
+
+          <div className="space-y-2">
+            <label htmlFor="github-input" className="block text-sm font-semibold text-blue-700">
+              GitHub Profile (Optional)
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Github className="h-5 w-5 text-blue-500" />
+              </div>
+              <input
+                id="github-input"
+                type="url"
+                value={githubLink}
+                onChange={(e) => setGithubLink(e.target.value)}
+                placeholder="https://github.com/username"
+                disabled={isAnalyzing}
+                className="block w-full pl-10 pr-3 py-3 border border-blue-300 rounded-xl bg-white/80 text-blue-800 placeholder-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+              />
             </div>
-            <h3 className="text-3xl font-bold mb-3 text-gray-800">AI-Powered Resume Analysis</h3>
-            <p className="text-gray-600 text-lg">
-              Upload your resume and select preferred domains for personalized internship matching.
+            <p className="text-xs text-blue-600">
+              Add your GitHub profile to enhance portfolio analysis and get better recommendations
             </p>
           </div>
-          <div className="space-y-8">
-            <DomainPreferences
-              selectedPreferences={selectedPreferences}
-              availableDomains={availableDomains}
-              handlePreferenceToggle={handlePreferenceToggle}
+          <motion.label
+            whileHover={{ scale: 1.01, y: -2 }}
+            className="border-2 border-dashed border-blue-300 rounded-2xl p-8 text-center hover:border-blue-500 hover:bg-blue-50/50 transition-all duration-300 block cursor-pointer group relative overflow-hidden"
+          >
+            {/* Animated background effect */}
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-blue-600/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+              initial={false}
             />
 
-            <div className="space-y-2">
-              <label htmlFor="github-input" className="block text-sm font-semibold text-gray-700">
-                GitHub Profile (Optional)
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Github className="h-5 w-5 text-gray-500" />
-                </div>
-                <input
-                  id="github-input"
-                  type="url"
-                  value={githubLink}
-                  onChange={(e) => setGithubLink(e.target.value)}
-                  placeholder="https://github.com/username"
-                  disabled={isAnalyzing}
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl bg-white/80 text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                />
-              </div>
-              <p className="text-xs text-gray-600">
-                Add your GitHub profile to enhance portfolio analysis and get better recommendations
+            <input
+              id="resume-upload"
+              type="file"
+              accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              onChange={handleFileUpload}
+              className="hidden"
+              disabled={isAnalyzing}
+            />
+            <div className="space-y-4 relative z-10">
+              <motion.div
+                className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl text-white font-semibold hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl"
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                {isAnalyzing ? (
+                  <RefreshCw className="w-5 h-5 mr-3 animate-spin" />
+                ) : (
+                  <Upload className="w-5 h-5 mr-3" />
+                )}
+                {isAnalyzing ? 'Processing with AI...' : 'Upload Resume'}
+              </motion.div>
+              <p className="text-sm text-blue-600 font-medium">
+                Max 5MB, DOCX only. Our AI will extract and analyze everything.
               </p>
             </div>
-            <motion.label
-              whileHover={{ scale: 1.01, y: -2 }}
-              className="border-2 border-dashed border-blue-300 rounded-2xl p-8 text-center hover:border-blue-500 hover:bg-blue-50/50 transition-all duration-300 block cursor-pointer group relative overflow-hidden"
-            >
-              {/* Animated background effect */}
-              <motion.div
-                className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-blue-600/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                initial={false}
-              />
-
-              <input
-                id="resume-upload"
-                type="file"
-                accept=".doc,.docx,.pdf"
-                onChange={handleFileUpload}
-                className="hidden"
-                disabled={isAnalyzing}
-              />
-              <div className="space-y-4 relative z-10">
-                <motion.div
-                  className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl text-white font-semibold hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl"
-                  whileHover={{ scale: 1.05, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  {isAnalyzing ? (
-                    <RefreshCw className="w-5 h-5 mr-3 animate-spin" />
-                  ) : (
-                    <Upload className="w-5 h-5 mr-3" />
-                  )}
-                  {isAnalyzing ? 'Processing with AI...' : 'Upload Resume'}
-                </motion.div>
-                <p className="text-sm text-gray-600 font-medium">
-                  Max 5MB, DOC/DOCX/PDF only. Our AI will extract and analyze everything.
-                </p>
-              </div>
-            </motion.label>
-            {error && (
-              <ErrorDisplay error={error} retryAnalysis={retryAnalysis} />
-            )}
-            {isAnalyzing && (
-              <ProgressDisplay analysisStep={analysisStep} progress={progress} />
-            )}
-          </div>
+          </motion.label>
+          {error && (
+            <ErrorDisplay error={error} retryAnalysis={retryAnalysis} />
+          )}
+          {isAnalyzing && (
+            <ProgressDisplay analysisStep={analysisStep} progress={progress} />
+          )}
         </div>
-      </motion.div>
-    </>
+      </div>
+    </motion.div>
   );
 };
 
 const DomainPreferences = ({ selectedPreferences, availableDomains, handlePreferenceToggle }) => (
   <div>
-    <label className="block text-sm font-semibold text-gray-700 mb-4">
+    <label className="block text-sm font-semibold text-blue-700 mb-4">
       Select Your Domain Preferences ({selectedPreferences.length} selected)
     </label>
     <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-6 bg-blue-50/80 rounded-2xl border border-blue-200">
@@ -1037,19 +851,19 @@ const DomainPreferences = ({ selectedPreferences, availableDomains, handlePrefer
           whileTap={{ scale: 0.98 }}
           className={`p-3 text-sm rounded-xl transition-all font-medium border-2 ${selectedPreferences.includes(domain)
             ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-200'
-            : 'bg-white/80 text-gray-700 border-gray-200 hover:bg-white hover:border-blue-300 hover:text-blue-600'
+            : 'bg-white/80 text-blue-700 border-blue-200 hover:bg-white hover:border-blue-300 hover:text-blue-600'
             }`}
         >
           {domain}
         </motion.button>
       ))}
     </div>
-    <p className="text-xs text-gray-600 mt-3">
+    <p className="text-xs text-blue-600 mt-3">
       Select multiple domains to get diverse internship recommendations
     </p>
     {selectedPreferences.length > 0 && (
       <div className="mt-4">
-        <label className="block text-sm font-semibold text-gray-700 mb-3">
+        <label className="block text-sm font-semibold text-blue-700 mb-3">
           Selected Preferences:
         </label>
         <div className="flex flex-wrap gap-2">
@@ -1121,7 +935,7 @@ const ProgressDisplay = ({ analysisStep, progress }) => (
         transition={{ duration: 2, repeat: Infinity }}
       />
     </div>
-    <p className="text-sm text-gray-600 font-medium">
+    <p className="text-sm text-blue-600 font-medium">
       Processing may take up to 60 seconds. Our AI agents are working hard! 🤖
     </p>
   </motion.div>
@@ -1200,7 +1014,7 @@ const AnalysisCompleteBanner = ({ analysisResults, showAgentComm, setShowAgentCo
         </motion.div>
         <div>
           <h3 className="text-xl font-bold text-green-700">AI Analysis Complete!</h3>
-          <p className="text-gray-600 font-medium">
+          <p className="text-blue-600 font-medium">
             Resume processed successfully with {analysisResults.agent_communications?.length || 5} AI agents
           </p>
         </div>
@@ -1237,7 +1051,7 @@ const AnalysisCompleteBanner = ({ analysisResults, showAgentComm, setShowAgentCo
           whileHover={{ scale: 1.05, y: -2 }}
           whileTap={{ scale: 0.95 }}
           onClick={resetAnalysis}
-          className="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-xl text-sm transition-all font-medium"
+          className="px-4 py-2 bg-white border border-blue-300 hover:bg-blue-50 text-blue-700 rounded-xl text-sm transition-all font-medium"
         >
           New Analysis
         </motion.button>
@@ -1262,7 +1076,7 @@ const AgentCommunications = ({
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
           exit={{ opacity: 0, height: 0 }}
-          className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-lg p-6"
+          className="bg-blue-900/50 backdrop-blur-sm border border-blue-800 rounded-lg p-6"
         >
           <h3 className="text-xl font-bold mb-4 flex items-center">
             <MessageSquare className="w-5 h-5 mr-2 text-cyan-400" />
@@ -1302,12 +1116,12 @@ const AgentCommunicationItem = ({
     <motion.div
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
-      className="border border-gray-700 rounded-lg overflow-hidden"
+      className="border border-blue-700 rounded-lg overflow-hidden"
     >
       <motion.button
         whileHover={{ backgroundColor: 'rgba(55, 65, 81, 0.7)' }}
         onClick={() => setExpandedAgent(expandedAgent === agentName ? null : agentName)}
-        className="w-full flex items-center justify-between p-4 bg-gray-800/50 hover:bg-gray-800/70 transition-all"
+        className="w-full flex items-center justify-between p-4 bg-blue-800/50 hover:bg-blue-800/70 transition-all"
       >
         <div className="flex items-center gap-3">
           <motion.div
@@ -1317,7 +1131,7 @@ const AgentCommunicationItem = ({
             <Zap className="w-5 h-5 text-cyan-400" />
           </motion.div>
           <span className="font-semibold text-cyan-300">{agentName}</span>
-          <span className="text-sm text-gray-400">({communications.length} steps)</span>
+          <span className="text-sm text-blue-400">({communications.length} steps)</span>
           <div className="flex gap-1">
             {communications.map((comm, idx) => (
               <div
@@ -1338,7 +1152,7 @@ const AgentCommunicationItem = ({
           animate={{ rotate: expandedAgent === agentName ? 180 : 0 }}
           transition={{ duration: 0.3 }}
         >
-          <ChevronDown className="w-5 h-5 text-gray-400" />
+          <ChevronDown className="w-5 h-5 text-blue-400" />
         </motion.div>
       </motion.button>
       <AnimatePresence>
@@ -1347,7 +1161,7 @@ const AgentCommunicationItem = ({
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="bg-gray-900/30"
+            className="bg-blue-900/30"
           >
             <div className="p-4 space-y-3 max-h-96 overflow-y-auto">
               {communications.map((comm, idx) => (
@@ -1390,24 +1204,24 @@ const CommunicationStep = ({ comm, idx, getStatusIcon, getStatusColor }) => (
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="mb-2 p-3 bg-gray-800/30 rounded text-sm border-l-2 border-yellow-400"
+        className="mb-2 p-3 bg-blue-800/30 rounded text-sm border-l-2 border-yellow-400"
       >
         <span className="text-yellow-400 font-medium">🎯 Micro Goal:</span>
-        <span className="ml-2 text-gray-200">{comm.micro_goal}</span>
+        <span className="ml-2 text-blue-200">{comm.micro_goal}</span>
       </motion.div>
     )}
     {comm.data && Object.keys(comm.data).length > 0 && (
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="mt-2 p-3 bg-gray-800/20 rounded border"
+        className="mt-2 p-3 bg-blue-800/20 rounded border"
       >
-        <div className="text-xs text-gray-400 mb-2 font-medium">Processing Data:</div>
+        <div className="text-xs text-blue-400 mb-2 font-medium">Processing Data:</div>
         <div className="text-sm space-y-1 max-h-32 overflow-y-auto">
           {Object.entries(comm.data).map(([key, value]) => (
             <div key={key} className="flex justify-between items-start gap-2">
-              <span className="text-gray-300 capitalize text-xs">{key.replace(/_/g, ' ')}:</span>
-              <span className="text-gray-100 font-mono text-xs text-right max-w-xs break-words">
+              <span className="text-blue-300 capitalize text-xs">{key.replace(/_/g, ' ')}:</span>
+              <span className="text-blue-100 font-mono text-xs text-right max-w-xs break-words">
                 {typeof value === 'object'
                   ? `${JSON.stringify(value).slice(0, 30)}...`
                   : String(value).slice(0, 50) + (String(value).length > 50 ? '...' : '')
@@ -1432,7 +1246,7 @@ const ResumeTextExtraction = ({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-lg p-6"
+      className="bg-blue-500/50 backdrop-blur-sm border border-blue-800 rounded-lg p-6"
     >
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-xl font-bold flex items-center">
@@ -1444,7 +1258,7 @@ const ResumeTextExtraction = ({
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => copyToClipboard(analysisResults.file_info?.resume_text || '')}
-            className="px-3 py-1 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 rounded text-sm flex items-center gap-1 transition-all"
+            className="px-3 py-1 bg-blue-50 hover:bg-blue-600/30 text-blue-300 rounded text-sm flex items-center gap-1 transition-all"
           >
             <Copy className="w-3 h-3" />
             {copiedText ? 'Copied!' : 'Copy'}
@@ -1453,7 +1267,7 @@ const ResumeTextExtraction = ({
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setShowFullText(!showFullText)}
-            className="px-3 py-1 bg-gray-600/20 hover:bg-gray-600/30 text-gray-300 rounded text-sm transition-all"
+            className="px-3 py-1 bg-blue-50 hover:bg-blue-600/30 text-blue-300 rounded text-sm transition-all"
           >
             {showFullText ? 'Collapse' : 'Expand'}
           </motion.button>
@@ -1475,9 +1289,9 @@ const DocumentStatistics = ({ extraction }) => (
   <div className="grid md:grid-cols-4 gap-4 mb-4">
     <motion.div
       whileHover={{ scale: 1.02 }}
-      className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50"
+      className="bg-white rounded-lg p-3 border border-purple-700/50"
     >
-      <p className="text-gray-400 text-xs mb-1">Document Stats</p>
+      <p className="text-purple-400 text-[15px] mb-1">Document Stats</p>
       <div className="text-sm space-y-1">
         <div className="flex justify-between">
           <span>Words:</span>
@@ -1495,9 +1309,9 @@ const DocumentStatistics = ({ extraction }) => (
     </motion.div>
     <motion.div
       whileHover={{ scale: 1.02 }}
-      className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50"
+      className="bg-white rounded-lg p-3 border border-indigo-700/50"
     >
-      <p className="text-gray-400 text-xs mb-1">Contact Detection</p>
+      <p className="text-indigo-500 text-[15px] mb-1">Contact Detection</p>
       <div className="text-sm space-y-1">
         <div className={`flex items-center justify-between ${extraction.email_patterns_found > 0 ? 'text-green-400' : 'text-red-400'}`}>
           <span>📧 Email:</span>
@@ -1507,7 +1321,7 @@ const DocumentStatistics = ({ extraction }) => (
           <span>📱 Phone:</span>
           <span className="font-mono">{extraction.phone_patterns_found || '0'}</span>
         </div>
-        <div className={`flex items-center justify-between ${extraction.url_patterns_found > 0 ? 'text-green-400' : 'text-gray-400'}`}>
+        <div className={`flex items-center justify-between ${extraction.url_patterns_found > 0 ? 'text-green-400' : 'text-red-400'}`}>
           <span>🔗 URLs:</span>
           <span className="font-mono">{extraction.url_patterns_found || '0'}</span>
         </div>
@@ -1515,10 +1329,10 @@ const DocumentStatistics = ({ extraction }) => (
     </motion.div>
     <motion.div
       whileHover={{ scale: 1.02 }}
-      className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50"
+      className="bg-white rounded-lg p-3 border border-blue-700/50"
     >
-      <p className="text-gray-400 text-xs mb-1">AI Processing</p>
-      <div className="text-sm space-y-1">
+      <p className="text-blue-300 text-[15[x]] mb-1">AI Processing</p>
+      <div className="text-[12px] space-y-1">
         <div className="text-green-400">✓ Text Extracted</div>
         <div className="text-green-400">✓ Patterns Detected</div>
         <div className="text-green-400">✓ Structure Analyzed</div>
@@ -1526,10 +1340,10 @@ const DocumentStatistics = ({ extraction }) => (
     </motion.div>
     <motion.div
       whileHover={{ scale: 1.02 }}
-      className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50"
+      className="bg-white rounded-lg p-3 border border-emerald-700/50"
     >
-      <p className="text-gray-400 text-xs mb-1">Sections Found</p>
-      <div className="text-xs">
+      <p className="text-emerald-300 text-[15px] mb-1">Sections Found</p>
+      <div className="text-[10px]">
         <span className="text-purple-400 font-mono">
           {extraction.sections_detected?.length || 0} sections
         </span>
@@ -1541,7 +1355,7 @@ const DocumentStatistics = ({ extraction }) => (
           </span>
         ))}
         {(extraction.sections_detected?.length || 0) > 3 && (
-          <span className="text-xs text-gray-400">+{extraction.sections_detected?.length - 3 || 0}</span>
+          <span className="text-xs text-emerald-400">+{extraction.sections_detected?.length - 3 || 0}</span>
         )}
       </div>
     </motion.div>
@@ -1549,17 +1363,17 @@ const DocumentStatistics = ({ extraction }) => (
 );
 
 const ExtractedTextDisplay = ({ analysisResults, showFullText, setShowFullText }) => (
-  <div className="bg-gray-800/30 rounded-lg border border-gray-700/50 overflow-hidden">
-    <div className="flex items-center justify-between p-3 bg-gray-800/50 border-b border-gray-700/50">
-      <h4 className="font-semibold text-gray-300 flex items-center">
+  <div className="bg-slate-800/30 rounded-lg border border-slate-700/50 overflow-hidden">
+    <div className="flex items-center justify-between p-3 bg-slate-800/50 border-b border-slate-700/50">
+      <h4 className="font-semibold text-slate-200 flex items-center">
         <Brain className="w-4 h-4 mr-2 text-blue-400" />
         Extracted Resume Content
       </h4>
-      <span className="text-xs text-gray-400">
+      <span className="text-xs text-slate-300">
         Processed by Gemini AI
       </span>
     </div>
-    <div className={`p-4 bg-gray-900/50 text-sm text-gray-300 whitespace-pre-wrap font-mono leading-relaxed ${showFullText ? 'max-h-none' : 'max-h-64'
+    <div className={`p-4 bg-slate-900/50 text-sm text-slate-200 whitespace-pre-wrap font-mono leading-relaxed ${showFullText ? 'max-h-none' : 'max-h-64'
       } overflow-y-auto transition-all duration-300`}>
       {analysisResults.file_info?.resume_text ? (
         <motion.div
@@ -1574,13 +1388,13 @@ const ExtractedTextDisplay = ({ analysisResults, showFullText, setShowFullText }
           }
         </motion.div>
       ) : (
-        <div className="text-gray-500 italic text-center py-8">
+        <div className="text-slate-500 italic text-center py-8">
           No resume text extracted. Please try uploading a different file.
         </div>
       )}
     </div>
     {!showFullText && analysisResults.file_info?.resume_text?.length > 1000 && (
-      <div className="p-3 bg-gray-800/30 border-t border-gray-700/50 text-center">
+      <div className="p-3 bg-slate-800/30 border-t border-slate-700/50 text-center">
         <motion.button
           whileHover={{ scale: 1.02 }}
           onClick={() => setShowFullText(true)}
@@ -1601,7 +1415,7 @@ const ProfileSummary = ({ analysisResults }) => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.1 }}
-      className="bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-lg p-6"
+      className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-lg p-6"
     >
       <h3 className="text-xl font-bold mb-4 flex items-center">
         <User className="w-5 h-5 mr-2 text-blue-400" />
@@ -1886,7 +1700,7 @@ const InternshipRecommendations = ({ analysisResults }) => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.2 }}
-      className="col-span-full bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-lg p-6"
+      className="col-span-full bg-blue-900/50 backdrop-blur-sm border border-blue-800 rounded-lg p-6"
     >
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-2xl font-bold flex items-center">
@@ -2998,328 +2812,6 @@ const FeaturesSection = () => {
           </motion.div>
         ))}
       </div>
-    </motion.div>
-  );
-};
-
-// Quick Actions Grid Component
-const QuickActionsGrid = ({ quickActions }) => {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.2 }}
-      className="mb-8"
-    >
-      <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">Quick Actions</h2>
-        <p className="text-gray-600">Choose an action to get started with your career journey</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {quickActions.map((action, index) => (
-          <motion.div
-            key={index}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 + index * 0.1 }}
-            whileHover={{ scale: 1.02, y: -4 }}
-            onClick={action.onClick}
-            className="group cursor-pointer bg-white/90 backdrop-blur-sm border border-blue-200 rounded-2xl p-6 hover:shadow-xl hover:border-blue-300 transition-all duration-300"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className={`w-14 h-14 bg-gradient-to-r ${action.iconBg} rounded-xl flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-                {action.icon}
-              </div>
-              {action.stats && (
-                <div className="text-right">
-                  <div className="text-xs text-gray-500 mb-1">Success Rate</div>
-                  <div className="text-sm font-bold text-green-600">{action.stats.accuracy || '95%'}</div>
-                </div>
-              )}
-            </div>
-
-            <h3 className="text-xl font-bold text-gray-800 mb-2">{action.title}</h3>
-            <p className="text-gray-600 mb-4 leading-relaxed">{action.description}</p>
-
-            <div className="flex flex-wrap gap-2 mb-4">
-              {action.features.map((feature, idx) => (
-                <span
-                  key={idx}
-                  className="px-3 py-1 bg-blue-100 text-blue-700 text-xs rounded-full"
-                >
-                  {feature}
-                </span>
-              ))}
-            </div>
-
-            {action.stats && (
-              <div className="grid grid-cols-3 gap-2 pt-4 border-t border-gray-200">
-                {Object.entries(action.stats).map(([key, value], idx) => (
-                  <div key={idx} className="text-center">
-                    <div className="text-sm font-bold text-gray-800">{value}</div>
-                    <div className="text-xs text-gray-500 capitalize">{key}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <motion.div
-              className="mt-4 flex items-center text-blue-600 font-medium group-hover:text-blue-700"
-              whileHover={{ x: 5 }}
-            >
-              Get Started
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </motion.div>
-          </motion.div>
-        ))}
-      </div>
-    </motion.div>
-  );
-};
-
-// Dashboard Overview Component
-const DashboardOverview = ({ analysisResults }) => {
-  const profile = analysisResults.student_profile || {};
-  const recommendations = analysisResults.internship_recommendations || [];
-  const gaps = analysisResults.portfolio_gaps || [];
-  const readiness = analysisResults.readiness_evaluations?.[0];
-
-  const skillCategories = {
-    'Programming Languages': profile.programming_languages || [],
-    'Frameworks': profile.frameworks || [],
-    'Tools': profile.tools || [],
-    'Databases': profile.databases || []
-  };
-
-  const topDomains = recommendations
-    .reduce((acc, rec) => {
-      acc[rec.domain] = (acc[rec.domain] || 0) + 1;
-      return acc;
-    }, {});
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.3 }}
-      className="mb-8"
-    >
-      <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">Your Dashboard Overview</h2>
-        <p className="text-gray-600">Comprehensive insights from your AI analysis</p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Skills Breakdown */}
-        <motion.div
-          whileHover={{ scale: 1.01 }}
-          className="bg-white/90 backdrop-blur-sm border border-blue-200 rounded-2xl p-6 shadow-lg"
-        >
-          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-            <Code className="w-5 h-5 mr-2 text-blue-600" />
-            Skills Breakdown
-          </h3>
-          <div className="space-y-4">
-            {Object.entries(skillCategories).map(([category, skills], index) => (
-              skills.length > 0 && (
-                <div key={category}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">{category}</span>
-                    <span className="text-sm text-blue-600 font-bold">{skills.length}</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <motion.div
-                      className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.min((skills.length / 10) * 100, 100)}%` }}
-                      transition={{ delay: index * 0.1, duration: 0.8 }}
-                    />
-                  </div>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {skills.slice(0, 3).map((skill, idx) => (
-                      <span
-                        key={idx}
-                        className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full"
-                      >
-                        {skill}
-                      </span>
-                    ))}
-                    {skills.length > 3 && (
-                      <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
-                        +{skills.length - 3}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Match Quality */}
-        <motion.div
-          whileHover={{ scale: 1.01 }}
-          className="bg-white/90 backdrop-blur-sm border border-blue-200 rounded-2xl p-6 shadow-lg"
-        >
-          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-            <Target className="w-5 h-5 mr-2 text-green-600" />
-            Match Quality
-          </h3>
-          <div className="space-y-4">
-            <div className="text-center">
-              <div className="relative w-24 h-24 mx-auto mb-4">
-                <svg className="w-24 h-24 transform -rotate-90" viewBox="0 0 24 24">
-                  <circle
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    fill="none"
-                    className="text-gray-200"
-                  />
-                  <motion.circle
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    fill="none"
-                    className="text-green-500"
-                    strokeLinecap="round"
-                    initial={{ strokeDasharray: "0 63" }}
-                    animate={{
-                      strokeDasharray: `${(recommendations.reduce((acc, rec) => acc + rec.matching_score, 0) / (recommendations.length || 1)) * 63} 63`
-                    }}
-                    transition={{ duration: 1, delay: 0.5 }}
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-xl font-bold text-gray-800">
-                    {Math.round((recommendations.reduce((acc, rec) => acc + rec.matching_score, 0) / (recommendations.length || 1)) * 100)}%
-                  </span>
-                </div>
-              </div>
-              <p className="text-sm text-gray-600">Average Match Score</p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">High Matches (80%+)</span>
-                <span className="font-bold text-green-600">
-                  {recommendations.filter(r => r.matching_score >= 0.8).length}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Good Matches (60%+)</span>
-                <span className="font-bold text-yellow-600">
-                  {recommendations.filter(r => r.matching_score >= 0.6 && r.matching_score < 0.8).length}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Fair Matches</span>
-                <span className="font-bold text-orange-600">
-                  {recommendations.filter(r => r.matching_score < 0.6).length}
-                </span>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Readiness Score */}
-        <motion.div
-          whileHover={{ scale: 1.01 }}
-          className="bg-white/90 backdrop-blur-sm border border-blue-200 rounded-2xl p-6 shadow-lg"
-        >
-          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-            <Star className="w-5 h-5 mr-2 text-yellow-600" />
-            Readiness Score
-          </h3>
-          <div className="space-y-4">
-            {readiness && (
-              <>
-                <div className="text-center">
-                  <motion.div
-                    className="text-4xl font-bold text-yellow-600 mb-2"
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.8, type: "spring" }}
-                  >
-                    {Math.round((readiness.readiness_score || readiness.overall_score || readiness.internship_readiness_score || 0.75) * 100)}%
-                  </motion.div>
-                  <p className="text-sm text-gray-600">Overall Readiness</p>
-                </div>
-
-                <div className="space-y-3">
-                  {Object.entries({
-                    'Technical Skills': readiness.technical_score || 0.8,
-                    'Experience': readiness.experience_score || 0.7,
-                    'Portfolio': readiness.portfolio_score || 0.6
-                  }).map(([category, score], index) => (
-                    <div key={category}>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="text-gray-600">{category}</span>
-                        <span className="font-bold">{Math.round(score * 100)}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <motion.div
-                          className={`h-2 rounded-full ${score >= 0.8 ? 'bg-gradient-to-r from-green-500 to-green-600' :
-                              score >= 0.6 ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' :
-                                'bg-gradient-to-r from-red-500 to-red-600'
-                            }`}
-                          initial={{ width: 0 }}
-                          animate={{ width: `${score * 100}%` }}
-                          transition={{ delay: 0.5 + index * 0.1, duration: 0.8 }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Top Recommendations Preview */}
-      {recommendations.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="mt-6 bg-white/90 backdrop-blur-sm border border-blue-200 rounded-2xl p-6 shadow-lg"
-        >
-          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-            <Briefcase className="w-5 h-5 mr-2 text-purple-600" />
-            Top Recommendations
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {recommendations.slice(0, 3).map((rec, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.7 + index * 0.1 }}
-                whileHover={{ scale: 1.02 }}
-                className="p-4 bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-xl hover:shadow-md transition-all"
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <h4 className="font-semibold text-gray-800 truncate">{rec.title}</h4>
-                  <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                    {Math.round(rec.matching_score * 100)}%
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600 mb-2">{rec.company}</p>
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <span>{rec.location || 'Remote'}</span>
-                  <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">{rec.domain}</span>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      )}
     </motion.div>
   );
 };

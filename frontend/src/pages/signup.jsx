@@ -169,7 +169,7 @@ const Signup = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="text-4xl font-bold text-gray-800 mb-4"
+                className="text-4xl font-bold text-slate-800 mb-4"
               >
                 Join <span className="bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">InternAI</span>
               </motion.h1>
@@ -177,7 +177,7 @@ const Signup = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="text-lg text-gray-600 mb-8"
+                className="text-lg text-slate-600 mb-8"
               >
                 Unlock your potential with AI-powered internship matching and career guidance.
               </motion.p>
@@ -196,8 +196,8 @@ const Signup = () => {
                     {benefit.icon}
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-800 mb-1">{benefit.title}</h3>
-                    <p className="text-gray-600 text-sm">{benefit.description}</p>
+                    <h3 className="font-semibold text-slate-800 mb-1">{benefit.title}</h3>
+                    <p className="text-slate-600 text-sm">{benefit.description}</p>
                   </div>
                 </motion.div>
               ))}
@@ -221,8 +221,8 @@ const Signup = () => {
                 >
                   <Sparkles className="w-8 h-8 text-white" />
                 </motion.div>
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">Create Your Account</h2>
-                <p className="text-gray-600">Start your AI-powered career journey today</p>
+                <h2 className="text-2xl font-bold text-slate-800 mb-2">Create Your Account</h2>
+                <p className="text-slate-600">Start your AI-powered career journey today</p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-6">
