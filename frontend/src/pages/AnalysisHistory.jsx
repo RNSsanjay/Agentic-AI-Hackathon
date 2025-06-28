@@ -550,19 +550,19 @@ const AnalysisCard = ({ analysis, index, onView, onDelete, onExport }) => {
                                 {analysis.overall_readiness_score || 0}% Ready
                             </div>
                         </div>
-                        <div className="flex items-center space-x-2 text-purple-600">
+                        {/* <div className="flex items-center space-x-2 text-purple-600">
                             <Target className="w-4 h-4" />
                             <span className="text-sm font-medium">
                                 {analysis.internship_recommendations?.length || 0} matches
                             </span>
-                        </div>
+                        </div> */}
 
-                        <div className="flex items-center space-x-2 text-orange-600">
+                        {/* <div className="flex items-center space-x-2 text-orange-600">
                             <AlertCircle className="w-4 h-4" />
                             <span className="text-sm font-medium">
                                 {analysis.portfolio_gaps?.length || 0} gaps
                             </span>
-                        </div>
+                        </div> */}
                     </div>
 
                     <div className="flex items-center space-x-4 mb-4">
