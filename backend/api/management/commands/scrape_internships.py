@@ -12,8 +12,8 @@ class Command(BaseCommand):
         parser.add_argument(
             '--sources',
             nargs='+',
-            choices=['indeed', 'linkedin', 'naukri'],
-            default=['indeed', 'linkedin', 'naukri'],
+            choices=['indeed', 'linkedin', 'naukri', 'internshala', 'letsintern'],
+            default=['indeed', 'linkedin', 'naukri', 'internshala', 'letsintern'],
             help='Specify which sources to scrape from'
         )
         parser.add_argument(
@@ -151,6 +151,28 @@ class Command(BaseCommand):
             except Exception as e:
                 self.stdout.write(
                     self.style.WARNING(f'Naukri scraping failed: {e}')
+                )
+
+        if 'internshala' in sources:
+            self.stdout.write('Scraping Internshala...')
+            try:
+                internshala_results = await scraper.scrape_internshala(keyword, location, max_pages)
+                all_internships.extend(internshala_results)
+                self.stdout.write(f'Internshala: {len(internshala_results)} internships found')
+            except Exception as e:
+                self.stdout.write(
+                    self.style.WARNING(f'Internshala scraping failed: {e}')
+                )
+
+        if 'letsintern' in sources:
+            self.stdout.write('Scraping LetsIntern...')
+            try:
+                letsintern_results = await scraper.scrape_letsintern(keyword, location, max_pages)
+                all_internships.extend(letsintern_results)
+                self.stdout.write(f'LetsIntern: {len(letsintern_results)} internships found')
+            except Exception as e:
+                self.stdout.write(
+                    self.style.WARNING(f'LetsIntern scraping failed: {e}')
                 )
 
         return all_internships

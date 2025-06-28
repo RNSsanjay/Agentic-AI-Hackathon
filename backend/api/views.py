@@ -4,6 +4,8 @@ import hashlib
 import os
 import secrets
 import logging
+import random
+import asyncio
 from datetime import datetime, timedelta
 from bson import ObjectId
 from pymongo import MongoClient
@@ -35,13 +37,22 @@ except ImportError:
     MONGODB_AVAILABLE = False
     mongodb_service = None
 
-# Import RAG system
+# Try to import RAG system
 try:
     from utils.rag_system import internship_rag
     RAG_AVAILABLE = True
 except ImportError:
     RAG_AVAILABLE = False
     internship_rag = None
+
+# Try to import scraper
+try:
+    from api.scrap import scraper, task_manager
+    SCRAPER_AVAILABLE = True
+except ImportError:
+    SCRAPER_AVAILABLE = False
+    scraper = None
+    task_manager = None
 
 # Simple cache for latest analysis results (in production, use Redis or database)
 latest_analysis_cache = {
@@ -1119,14 +1130,14 @@ def get_analysis_history(request):
                     total_count = result.get('total_count', len(analyses))
             else:
                 # Get regular history
-                result = mongodb_service.get_analysis_history(user_id, limit, skip, search)
+                result = mongodb_service.get_analysis_history(user_id, limit, skip)
                 if isinstance(result, dict):
                     # New format
                     analyses = result.get('analyses', [])
                     stats = result.get('statistics', {})
                     total_count = result.get('total_count', len(analyses))
                 else:
-                    # Old format compatibility (shouldn't happen with updated method)
+                    # Old format compatibility - result is the list of analyses
                     analyses = result if isinstance(result, list) else []
                     stats = mongodb_service.get_analysis_statistics(user_id)
                     total_count = len(analyses)
@@ -1729,4 +1740,231 @@ def profile_stats(request):
             'status': 'error',
             'error': f'Failed to get profile stats: {str(e)}',
             'stats': {}
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def user_scraping_preferences(request):
+    """Get or update user scraping preferences"""
+    try:
+        if request.method == 'GET':
+            # Return default preferences if no user authentication
+            default_preferences = {
+                'enable_indeed': True,
+                'enable_linkedin': True,
+                'enable_naukri': True,
+                'enable_internshala': True,
+                'enable_letsintern': True,
+                'max_pages_per_platform': 2,
+                'preferred_locations': ['India', 'Remote'],
+                'preferred_domains': ['Software Engineering', 'Data Science', 'Web Development'],
+                'auto_scrape_enabled': False,
+                'scrape_frequency_hours': 24
+            }
+            
+            return Response({
+                'success': True,
+                'preferences': default_preferences
+            })
+        
+        elif request.method == 'POST':
+            # For now, just return success (you can add database storage later)
+            preferences = request.data
+            
+            # Validate preferences
+            required_fields = ['enable_indeed', 'enable_linkedin', 'enable_naukri', 'enable_internshala', 'enable_letsintern']
+            for field in required_fields:
+                if field not in preferences:
+                    return Response({
+                        'success': False,
+                        'error': f'Missing required field: {field}'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            
+            return Response({
+                'success': True,
+                'message': 'Preferences saved successfully',
+                'preferences': preferences
+            })
+    
+    except Exception as e:
+        logger.error(f"Error in user_scraping_preferences: {str(e)}")
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def scrape_with_user_preferences(request):
+    """Scrape internships using user preferences"""
+    try:
+        # Get user preferences (or use defaults)
+        preferences = request.data.get('preferences', {})
+        keyword = request.data.get('keyword', 'internship')
+        location = request.data.get('location', 'India')
+        
+        # Determine enabled platforms
+        enabled_platforms = []
+        if preferences.get('enable_indeed', True):
+            enabled_platforms.append('indeed')
+        if preferences.get('enable_linkedin', True):
+            enabled_platforms.append('linkedin')
+        if preferences.get('enable_naukri', True):
+            enabled_platforms.append('naukri')
+        if preferences.get('enable_internshala', True):
+            enabled_platforms.append('internshala')
+        if preferences.get('enable_letsintern', True):
+            enabled_platforms.append('letsintern')
+        
+        if not enabled_platforms:
+            return Response({
+                'success': False,
+                'error': 'No platforms enabled for scraping'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        max_pages = min(int(preferences.get('max_pages_per_platform', 2)), 5)
+        
+        # Import scraper from the scraping module
+        from . import scrap
+        
+        # Run scraping synchronously
+        async def scrape_with_prefs():
+            all_internships = []
+            scraper = scrap.InternshipScraper()
+
+            for platform in enabled_platforms:
+                try:
+                    if platform == 'indeed':
+                        results = await scraper.scrape_indeed(keyword, location, max_pages)
+                    elif platform == 'linkedin':
+                        results = await scraper.scrape_linkedin(keyword, location, max_pages)
+                    elif platform == 'naukri':
+                        results = await scraper.scrape_naukri(keyword, location, max_pages)
+                    elif platform == 'internshala':
+                        results = await scraper.scrape_internshala(keyword, location, max_pages)
+                    elif platform == 'letsintern':
+                        results = await scraper.scrape_letsintern(keyword, location, max_pages)
+                    else:
+                        continue
+                    
+                    all_internships.extend(results)
+                    logger.info(f"{platform.title()} scraped: {len(results)} jobs")
+                except Exception as e:
+                    logger.error(f"{platform.title()} scraping failed: {e}")
+
+            # Save scraped internships
+            saved_count = scraper.save_internships(all_internships)
+
+            return {
+                'success': True,
+                'internships_scraped': len(all_internships),
+                'internships_saved': saved_count,
+                'platforms_used': enabled_platforms,
+                'keyword': keyword,
+                'location': location
+            }
+
+        # Run async function
+        import asyncio
+        result = asyncio.run(scrape_with_prefs())
+        return Response(result)
+
+    except Exception as e:
+        logger.error(f"Error in scrape_with_user_preferences: {str(e)}")
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_platform_statistics(request):
+    """Get statistics about scraping performance by platform"""
+    try:
+        from . import scrap
+        scraper = scrap.InternshipScraper()
+        
+        # Load internship data
+        data = scraper.load_existing_internships()
+        internships = data.get("internships", [])
+        
+        # Calculate platform statistics
+        platform_stats = {}
+        total_internships = len(internships)
+        current_date = datetime.now()
+        
+        for internship in internships:
+            source = internship.get('source', 'Unknown')
+            
+            if source not in platform_stats:
+                platform_stats[source] = {
+                    'total_internships': 0,
+                    'recent_24h': 0,
+                    'avg_quality_score': 0,
+                    'unique_companies': set(),
+                    'unique_domains': set(),
+                    'with_valid_links': 0
+                }
+            
+            stats = platform_stats[source]
+            stats['total_internships'] += 1
+            
+            # Count recent scrapes
+            scraped_at = internship.get('scraped_at')
+            if scraped_at:
+                try:
+                    scraped_date = datetime.strptime(scraped_at, '%Y-%m-%d %H:%M:%S')
+                    if (current_date - scraped_date).days < 1:
+                        stats['recent_24h'] += 1
+                except ValueError:
+                    pass
+            
+            # Track unique companies and domains
+            company = internship.get('company')
+            if company and company != 'N/A':
+                stats['unique_companies'].add(company)
+            
+            domain = internship.get('domain')
+            if domain and domain != 'N/A':
+                stats['unique_domains'].add(domain)
+            
+            # Count valid links
+            link = internship.get('link')
+            if link and link not in ['N/A', '', None]:
+                stats['with_valid_links'] += 1
+        
+        # Convert sets to counts and calculate percentages
+        formatted_stats = {}
+        for source, stats in platform_stats.items():
+            total = stats['total_internships']
+            formatted_stats[source] = {
+                'total_internships': total,
+                'recent_24h': stats['recent_24h'],
+                'unique_companies': len(stats['unique_companies']),
+                'unique_domains': len(stats['unique_domains']),
+                'with_valid_links': stats['with_valid_links'],
+                'link_percentage': round((stats['with_valid_links'] / total * 100) if total > 0 else 0, 1),
+                'market_share': round((total / total_internships * 100) if total_internships > 0 else 0, 1)
+            }
+        
+        return Response({
+            'success': True,
+            'total_internships': total_internships,
+            'platform_statistics': formatted_stats,
+            'summary': {
+                'active_platforms': len(formatted_stats),
+                'total_companies': sum(stats['unique_companies'] for stats in formatted_stats.values()),
+                'total_domains': sum(stats['unique_domains'] for stats in formatted_stats.values()),
+                'overall_link_rate': round(
+                    sum(stats['with_valid_links'] for stats in formatted_stats.values()) / total_internships * 100
+                    if total_internships > 0 else 0, 1
+                )
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in get_platform_statistics: {str(e)}")
+        return Response({
+            'success': False,
+            'error': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

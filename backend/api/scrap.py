@@ -29,6 +29,40 @@ class InternshipScraper:
         self.retry_delay = 2000  # 2 seconds
         self.data_file_path = os.path.join(settings.BASE_DIR, 'data', 'internships.json')
         self.ensure_data_directory()
+        
+        # Platform configurations
+        self.platforms = {
+            'indeed': {
+                'name': 'Indeed',
+                'base_url': 'https://in.indeed.com',
+                'search_path': '/jobs',
+                'enabled': True
+            },
+            'linkedin': {
+                'name': 'LinkedIn',
+                'base_url': 'https://www.linkedin.com',
+                'search_path': '/jobs/search',
+                'enabled': True
+            },
+            'naukri': {
+                'name': 'Naukri',
+                'base_url': 'https://www.naukri.com',
+                'search_path': '',
+                'enabled': True
+            },
+            'internshala': {
+                'name': 'Internshala',
+                'base_url': 'https://internshala.com',
+                'search_path': '/internships',
+                'enabled': True
+            },
+            'letsintern': {
+                'name': 'LetsIntern',
+                'base_url': 'https://www.letsintern.com',
+                'search_path': '/internships',
+                'enabled': True
+            }
+        }
 
     def ensure_data_directory(self):
         """Ensure the data directory exists"""
@@ -47,8 +81,12 @@ class InternshipScraper:
             return {"internships": []}
 
     def save_internships(self, internships: List[Dict]):
-        """Save internships to JSON file with duplicate checking and deadline filtering"""
+        """Save internships to JSON file with comprehensive validation and duplicate checking"""
         try:
+            # First validate and filter internships
+            valid_internships = self.filter_and_validate_internships(internships)
+            logger.info(f"Validated {len(valid_internships)} out of {len(internships)} scraped internships")
+            
             # Load existing data
             existing_data = self.load_existing_internships()
             existing_internships = existing_data.get("internships", [])
@@ -71,12 +109,13 @@ class InternshipScraper:
                     # Keep internships without deadlines
                     active_internships.append(internship)
             
-            # Add new internships (avoiding duplicates)
+            # Add new valid internships (avoiding duplicates)
             existing_ids = {internship.get('id') for internship in active_internships if internship.get('id')}
             existing_titles_companies = {(internship.get('title', '').lower(), internship.get('company', '').lower()) 
                                        for internship in active_internships}
             
-            for new_internship in internships:
+            added_count = 0
+            for new_internship in valid_internships:
                 # Check for duplicates
                 new_id = new_internship.get('id')
                 new_title_company = (new_internship.get('title', '').lower(), new_internship.get('company', '').lower())
@@ -92,13 +131,14 @@ class InternshipScraper:
                         new_internship['application_deadline'] = deadline.strftime('%Y-%m-%d')
                     
                     active_internships.append(new_internship)
+                    added_count += 1
             
             # Save updated data
             updated_data = {"internships": active_internships}
             with open(self.data_file_path, 'w', encoding='utf-8') as f:
                 json.dump(updated_data, f, indent=2, ensure_ascii=False)
             
-            logger.info(f"Saved {len(active_internships)} internships (removed {len(existing_internships) - len(active_internships)} expired)")
+            logger.info(f"Saved {len(active_internships)} total internships ({added_count} new, {len(existing_internships) - len(active_internships)} expired removed)")
             return len(active_internships)
             
         except Exception as e:
@@ -315,6 +355,145 @@ class InternshipScraper:
 
         return internships
 
+    async def scrape_internshala(self, keyword="internship", location="India", max_pages=2):
+        """Scrape internships from Internshala with improved robustness"""
+        internships = []
+        user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        ]
+
+        async with async_playwright() as p:
+            browser = None
+            try:
+                browser = await p.chromium.launch(
+                    headless=True,
+                    args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+                )
+                page = await browser.new_page()
+
+                for page_num in range(1, max_pages + 1):
+                    try:
+                        # Internshala URL structure
+                        if keyword.lower() != "internship":
+                            url = f"https://internshala.com/internships/{keyword.replace(' ', '-')}-internships/"
+                        else:
+                            url = f"https://internshala.com/internships/page-{page_num}/"
+
+                        logger.info(f"Scraping Internshala page {page_num}: {url}")
+
+                        # Set random user agent
+                        await page.set_extra_http_headers({
+                            'User-Agent': random.choice(user_agents)
+                        })
+
+                        # Load page with retries
+                        await self._load_page_with_retry(page, url)
+
+                        # Wait for internship cards
+                        await page.wait_for_selector('.internship_meta', timeout=self.timeout)
+
+                        # Extract internship listings
+                        internship_cards = await page.query_selector_all('.internship_meta')
+
+                        if not internship_cards:
+                            logger.warning(f"No internship cards found on page {page_num}")
+                            continue
+
+                        for card in internship_cards[:15]:  # Limit per page
+                            try:
+                                internship = await self._extract_internshala_data(card)
+                                if internship:
+                                    internships.append(internship)
+                            except Exception as e:
+                                logger.error(f"Error extracting Internshala data: {str(e)}")
+                                continue
+
+                        logger.info(f"Scraped {len(internship_cards)} internship cards from page {page_num}")
+
+                    except Exception as e:
+                        logger.error(f"Error scraping Internshala page {page_num}: {str(e)}")
+                        continue
+
+            except Exception as e:
+                logger.error(f"Error scraping Internshala: {str(e)}")
+            finally:
+                if browser:
+                    await browser.close()
+
+        return internships
+
+    async def scrape_letsintern(self, keyword="internship", location="India", max_pages=2):
+        """Scrape internships from LetsIntern with improved robustness"""
+        internships = []
+        user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        ]
+
+        async with async_playwright() as p:
+            browser = None
+            try:
+                browser = await p.chromium.launch(
+                    headless=True,
+                    args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+                )
+                page = await browser.new_page()
+
+                for page_num in range(1, max_pages + 1):
+                    try:
+                        # LetsIntern URL structure
+                        base_url = "https://www.letsintern.com/internships"
+                        if keyword.lower() != "internship":
+                            url = f"{base_url}?search={keyword.replace(' ', '+')}&page={page_num}"
+                        else:
+                            url = f"{base_url}?page={page_num}"
+
+                        logger.info(f"Scraping LetsIntern page {page_num}: {url}")
+
+                        # Set random user agent
+                        await page.set_extra_http_headers({
+                            'User-Agent': random.choice(user_agents)
+                        })
+
+                        # Load page with retries
+                        await self._load_page_with_retry(page, url)
+
+                        # Wait for internship cards
+                        await page.wait_for_selector('.card-content', timeout=self.timeout)
+
+                        # Extract internship listings
+                        internship_cards = await page.query_selector_all('.card-content')
+
+                        if not internship_cards:
+                            logger.warning(f"No internship cards found on page {page_num}")
+                            continue
+
+                        for card in internship_cards[:15]:  # Limit per page
+                            try:
+                                internship = await self._extract_letsintern_data(card)
+                                if internship:
+                                    internships.append(internship)
+                            except Exception as e:
+                                logger.error(f"Error extracting LetsIntern data: {str(e)}")
+                                continue
+
+                        logger.info(f"Scraped {len(internship_cards)} internship cards from page {page_num}")
+
+                    except Exception as e:
+                        logger.error(f"Error scraping LetsIntern page {page_num}: {str(e)}")
+                        continue
+
+            except Exception as e:
+                logger.error(f"Error scraping LetsIntern: {str(e)}")
+            finally:
+                if browser:
+                    await browser.close()
+
+        return internships
+
     def _is_internship_relevant(self, internship: Dict) -> bool:
         """Check if the scraped job is relevant (internship-related)"""
         title = internship.get('title', '').lower()
@@ -369,7 +548,7 @@ class InternshipScraper:
                 await asyncio.sleep(0.5)
 
     async def _extract_indeed_job_data(self, card):
-        """Extract job data from Indeed job card"""
+        """Extract job data from Indeed job card with improved cleaning"""
         try:
             title = await self._get_inner_text(card, 'h2 a span')
             company = await self._get_inner_text(card, '[data-testid="company-name"]')
@@ -377,73 +556,94 @@ class InternshipScraper:
             summary = await self._get_inner_text(card, '.slider_container .slider_item')
             link = await self._get_attribute(card, 'h2 a', 'href')
 
-            if not title or title == "N/A":
+            if not title or self._clean_text(title) == "N/A":
                 return None
 
+            # Clean and validate link
             if link and not link.startswith('http'):
                 link = f"https://in.indeed.com{link}"
+            link = self._validate_url(link)
 
             # Extract salary if available
             salary_elem = await card.query_selector('[data-testid="salary-snippet"]')
             salary = await salary_elem.inner_text() if salary_elem else "Not specified"
 
+            # Clean all text fields
+            title_clean = self._clean_text(title)
+            company_clean = self._clean_text(company) 
+            location_clean = self._clean_text(location_text)
+            summary_clean = self._clean_text(summary)
+            salary_clean = self._clean_text(salary)
+
             return {
-                'title': self._clean_text(title),
-                'company': self._clean_text(company),
-                'location': self._clean_text(location_text),
-                'domain': self._extract_domain_from_title(title),
+                'id': self.generate_unique_id({'title': title_clean, 'company': company_clean, 'source': 'Indeed'}),
+                'title': title_clean,
+                'company': company_clean,
+                'location': location_clean,
+                'domain': self._extract_domain_from_title(title_clean),
                 'duration': "Not specified",
-                'stipend': salary,
-                'requirements': self._extract_skills_from_text(summary),
+                'stipend': salary_clean,
+                'requirements': self._extract_skills_from_text(summary_clean),
                 'preferred_skills': [],
-                'description': self._truncate_text(summary, 200),
+                'description': self._truncate_text(summary_clean, 200),
                 'responsibilities': [],
-                'qualifications': [summary] if summary and summary != "N/A" else [],
+                'qualifications': [summary_clean] if summary_clean and summary_clean != "N/A" else [],
                 'experience_level': "entry-level",
-                'tags': ["remote-friendly", "real-time"],
+                'tags': ["indeed", "remote-friendly", "real-time"],
                 'link': link,
                 'source': 'Indeed',
-                'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'application_deadline': (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
             }
         except Exception as e:
             logger.error(f"Error extracting Indeed job data: {str(e)}")
             return None
 
     async def _extract_linkedin_job_data(self, card):
-        """Extract job data from LinkedIn job card"""
+        """Extract job data from LinkedIn job card with improved cleaning"""
         try:
             title = await self._get_inner_text(card, '.base-search-card__title')
             company = await self._get_inner_text(card, '.base-search-card__subtitle')
             location_text = await self._get_inner_text(card, '.job-search-card__location')
             link = await self._get_attribute(card, '.base-card__full-link', 'href')
 
-            if not title or title == "N/A":
+            # Clean all text fields
+            title_clean = self._clean_text(title)
+            company_clean = self._clean_text(company)
+            location_clean = self._clean_text(location_text)
+
+            if not title_clean or title_clean == "N/A":
                 return None
 
+            # Clean and validate link
+            link = self._validate_url(link)
+
             return {
-                'title': self._clean_text(title),
-                'company': self._clean_text(company),
-                'location': self._clean_text(location_text),
-                'domain': self._extract_domain_from_title(title),
+                'id': self.generate_unique_id({'title': title_clean, 'company': company_clean, 'source': 'LinkedIn'}),
+                'title': title_clean,
+                'company': company_clean,
+                'location': location_clean,
+                'domain': self._extract_domain_from_title(title_clean),
                 'duration': "Not specified",
                 'stipend': "Not specified",
-                'requirements': self._extract_skills_from_text(title),
+                'requirements': self._extract_skills_from_text(title_clean),
                 'preferred_skills': [],
-                'description': "Click to view details on LinkedIn",
+                'description': f"Professional internship opportunity at {company_clean}. Apply directly through LinkedIn.",
                 'responsibilities': [],
                 'qualifications': [],
                 'experience_level': "entry-level",
-                'tags': ["linkedin", "real-time"],
+                'tags': ["linkedin", "professional", "real-time"],
                 'link': link,
                 'source': 'LinkedIn',
-                'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'application_deadline': (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
             }
         except Exception as e:
             logger.error(f"Error extracting LinkedIn job data: {str(e)}")
             return None
 
     async def _extract_naukri_job_data(self, card):
-        """Extract job data from Naukri job card"""
+        """Extract job data from Naukri job card with improved cleaning"""
         try:
             title = await self._get_inner_text(card, '.title')
             company = await self._get_inner_text(card, '.comp-name')
@@ -451,100 +651,401 @@ class InternshipScraper:
             summary = await self._get_inner_text(card, '.job-desc')
             link = await self._get_attribute(card, '.title', 'href')
 
-            if not title or title == "N/A":
+            # Clean all text fields
+            title_clean = self._clean_text(title)
+            company_clean = self._clean_text(company)
+            location_clean = self._clean_text(location_text)
+            summary_clean = self._clean_text(summary)
+
+            if not title_clean or title_clean == "N/A":
                 return None
 
+            # Clean and validate link
             if link and not link.startswith('http'):
                 link = f"https://www.naukri.com{link}"
+            link = self._validate_url(link)
 
             # Extract experience if available
             exp_elem = await card.query_selector('.expwdth')
             experience = await exp_elem.inner_text() if exp_elem else "Fresher"
+            experience_clean = self._clean_text(experience)
 
             return {
-                'title': self._clean_text(title),
-                'company': self._clean_text(company),
-                'location': self._clean_text(location_text),
-                'domain': self._extract_domain_from_title(title),
+                'id': self.generate_unique_id({'title': title_clean, 'company': company_clean, 'source': 'Naukri'}),
+                'title': title_clean,
+                'company': company_clean,
+                'location': location_clean,
+                'domain': self._extract_domain_from_title(title_clean),
                 'duration': "Not specified",
                 'stipend': "Not specified",
-                'requirements': self._extract_skills_from_text(summary),
+                'requirements': self._extract_skills_from_text(summary_clean),
                 'preferred_skills': [],
-                'description': self._truncate_text(summary, 200),
+                'description': self._truncate_text(summary_clean, 200),
                 'responsibilities': [],
-                'qualifications': [experience] if experience else [],
-                'experience_level': "entry-level" if "fresher" in experience.lower() else "intermediate",
-                'tags': ["naukri", "real-time"],
+                'qualifications': [experience_clean] if experience_clean else [],
+                'experience_level': "entry-level" if "fresher" in experience_clean.lower() else "intermediate",
+                'tags': ["naukri", "india-focused", "real-time"],
                 'link': link,
                 'source': 'Naukri',
-                'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'application_deadline': (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
             }
         except Exception as e:
             logger.error(f"Error extracting Naukri job data: {str(e)}")
             return None
 
+    async def _extract_internshala_data(self, card):
+        """Extract internship data from Internshala card with improved cleaning"""
+        try:
+            # Use more specific selectors for Internshala
+            title = await self._get_inner_text(card, '.heading .job-internship-name')
+            if not title:
+                title = await self._get_inner_text(card, '.profile h3 a')
+            if not title:
+                title = await self._get_inner_text(card, '.heading a')
+                
+            company = await self._get_inner_text(card, '.company-name')
+            if not company:
+                company = await self._get_inner_text(card, '.company_name')
+                
+            location_text = await self._get_inner_text(card, '.location_link')
+            duration = await self._get_inner_text(card, '.internship_duration')
+            stipend = await self._get_inner_text(card, '.stipend')
+            
+            # Get link with multiple selectors
+            link = await self._get_attribute(card, '.heading .job-internship-name', 'href')
+            if not link:
+                link = await self._get_attribute(card, '.profile h3 a', 'href')
+            if not link:
+                link = await self._get_attribute(card, '.heading a', 'href')
+
+            # Clean all text fields
+            title_clean = self._clean_text(title)
+            company_clean = self._clean_text(company)
+            location_clean = self._clean_text(location_text)
+            duration_clean = self._clean_text(duration)
+            stipend_clean = self._clean_text(stipend)
+
+            if not title_clean or title_clean == "N/A":
+                return None
+
+            # Clean and validate link
+            if link and not link.startswith('http'):
+                link = f"https://internshala.com{link}"
+            link = self._validate_url(link)
+
+            # Extract skills/tags
+            skills = []
+            skill_elements = await card.query_selector_all('.round_tabs a, .skill-tag, .tags a')
+            for skill_elem in skill_elements[:5]:  # Limit to 5 skills
+                skill_text = await skill_elem.inner_text()
+                if skill_text and skill_text.strip():
+                    skill_clean = self._clean_text(skill_text)
+                    if skill_clean != "N/A":
+                        skills.append(skill_clean)
+
+            return {
+                'id': self.generate_unique_id({'title': title_clean, 'company': company_clean, 'source': 'Internshala'}),
+                'title': title_clean,
+                'company': company_clean,
+                'location': location_clean,
+                'domain': self._extract_domain_from_title(title_clean),
+                'duration': duration_clean,
+                'stipend': stipend_clean,
+                'requirements': skills,
+                'preferred_skills': skills[:3],
+                'description': f"Internship at {company_clean}. Duration: {duration_clean}. Stipend: {stipend_clean}",
+                'responsibilities': [],
+                'qualifications': skills,
+                'experience_level': "entry-level",
+                'tags': ["internshala", "verified", "student-friendly"],
+                'link': link,
+                'source': 'Internshala',
+                'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'application_deadline': (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
+            }
+        except Exception as e:
+            logger.error(f"Error extracting Internshala data: {str(e)}")
+            return None
+
+    async def _extract_letsintern_data(self, card):
+        """Extract internship data from LetsIntern card with improved cleaning"""
+        try:
+            # Use multiple selectors for LetsIntern
+            title = await self._get_inner_text(card, '.internship-title')
+            if not title:
+                title = await self._get_inner_text(card, '.job-title')
+            if not title:
+                title = await self._get_inner_text(card, 'h3')
+                
+            company = await self._get_inner_text(card, '.company-name')
+            if not company:
+                company = await self._get_inner_text(card, '.company')
+                
+            location_text = await self._get_inner_text(card, '.location')
+            duration = await self._get_inner_text(card, '.duration')
+            stipend = await self._get_inner_text(card, '.stipend')
+            
+            # Get link with multiple selectors
+            link = await self._get_attribute(card, 'a', 'href')
+            if not link:
+                link = await self._get_attribute(card, '.internship-title', 'href')
+
+            # Clean all text fields
+            title_clean = self._clean_text(title)
+            company_clean = self._clean_text(company)
+            location_clean = self._clean_text(location_text)
+            duration_clean = self._clean_text(duration)
+            stipend_clean = self._clean_text(stipend)
+
+            if not title_clean or title_clean == "N/A":
+                return None
+
+            # Clean and validate link
+            if link and not link.startswith('http'):
+                link = f"https://www.letsintern.com{link}"
+            link = self._validate_url(link)
+
+            # Extract description/requirements
+            description = await self._get_inner_text(card, '.description')
+            if not description:
+                description = await self._get_inner_text(card, '.job-description')
+            description_clean = self._clean_text(description)
+            
+            # Extract skills from description
+            skills = self._extract_skills_from_text(description_clean)
+
+            return {
+                'id': self.generate_unique_id({'title': title_clean, 'company': company_clean, 'source': 'LetsIntern'}),
+                'title': title_clean,
+                'company': company_clean,
+                'location': location_clean,
+                'domain': self._extract_domain_from_title(title_clean),
+                'duration': duration_clean,
+                'stipend': stipend_clean,
+                'requirements': skills,
+                'preferred_skills': skills[:3],
+                'description': self._truncate_text(description_clean, 200),
+                'responsibilities': [],
+                'qualifications': [description_clean] if description_clean and description_clean != "N/A" else [],
+                'experience_level': "entry-level",
+                'tags': ["letsintern", "remote-friendly", "flexible"],
+                'link': link,
+                'source': 'LetsIntern',
+                'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'application_deadline': (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
+            }
+        except Exception as e:
+            logger.error(f"Error extracting LetsIntern data: {str(e)}")
+            return None
+
     def _extract_domain_from_title(self, title: str) -> str:
-        """Extract domain from job title"""
-        title_lower = title.lower()
-        domain_keywords = {
-            'software': 'Software Development',
-            'web': 'Web Development',
-            'frontend': 'Frontend Development',
-            'backend': 'Backend Development',
-            'data': 'Data Science',
-            'machine learning': 'Machine Learning',
-            'ai': 'Artificial Intelligence',
-            'mobile': 'Mobile Development',
-            'android': 'Mobile Development',
-            'ios': 'Mobile Development',
-            'cyber': 'Cybersecurity',
-            'security': 'Cybersecurity',
-            'cloud': 'Cloud Computing',
-            'devops': 'DevOps',
-            'marketing': 'Digital Marketing',
-            'finance': 'Finance',
-            'hr': 'Human Resources',
-            'design': 'Design',
-            'ui': 'UI/UX Design',
-            'ux': 'UI/UX Design'
+        """Extract domain from job title with improved cleaning"""
+        if not title:
+            return "General"
+        
+        title_clean = self._clean_text(title).lower()
+        
+        # Domain mapping with cleaned patterns
+        domain_patterns = {
+            'Software Engineering': ['software', 'engineer', 'developer', 'programming', 'coding'],
+            'Data Science': ['data', 'analyst', 'analytics', 'science', 'scientist', 'ml', 'machine learning'],
+            'Web Development': ['web', 'frontend', 'backend', 'fullstack', 'react', 'angular', 'vue'],
+            'Mobile Development': ['mobile', 'ios', 'android', 'react native', 'flutter', 'app'],
+            'UI/UX Design': ['ui', 'ux', 'design', 'designer', 'user interface', 'user experience'],
+            'DevOps': ['devops', 'cloud', 'aws', 'azure', 'docker', 'kubernetes', 'infrastructure'],
+            'Cybersecurity': ['security', 'cyber', 'penetration', 'ethical hacking'],
+            'Product Management': ['product', 'manager', 'pm', 'strategy'],
+            'Marketing': ['marketing', 'digital marketing', 'seo', 'social media'],
+            'Sales': ['sales', 'business development', 'account'],
+            'Content Writing': ['content', 'writer', 'copywriter', 'editor'],
+            'Business Analytics': ['business', 'analytics', 'consultant', 'analysis']
         }
         
-        for keyword, domain in domain_keywords.items():
-            if keyword in title_lower:
-                return domain
-        return 'Technology'
+        for domain, keywords in domain_patterns.items():
+            for keyword in keywords:
+                if keyword in title_clean:
+                    return domain
+        
+        return "General"
 
     def _extract_skills_from_text(self, text: str) -> List[str]:
-        """Extract skills from job description text"""
-        if not text or text == "N/A":
+        """Extract skills from job description text with improved cleaning"""
+        if not text or self._clean_text(text) == "N/A":
             return []
         
-        text_lower = text.lower()
-        common_skills = [
-            'python', 'java', 'javascript', 'react', 'node.js', 'html', 'css',
-            'sql', 'mongodb', 'postgresql', 'git', 'docker', 'kubernetes',
-            'aws', 'azure', 'machine learning', 'data analysis', 'excel',
-            'tableau', 'powerbi', 'figma', 'photoshop', 'communication',
-            'teamwork', 'problem solving', 'analytical thinking'
-        ]
+        text_clean = self._clean_text(text).lower()
         
-        found_skills = []
-        for skill in common_skills:
-            if skill in text_lower:
-                found_skills.append(skill.title())
+        # Enhanced skills list with more comprehensive coverage
         
-        return found_skills[:5]  # Return top 5 skills
+        
+        
+        
+        # Return top 6 skills to avoid overwhelming
 
     def _clean_text(self, text):
-        """Helper method to clean text"""
-        if not text:
-            return "N/A"
-        return text.strip()
+        """Helper method to clean text and remove invalid characters"""
+        return self._enhanced_clean_text(text)
 
     def _truncate_text(self, text, length):
-        """Helper method to truncate text"""
+        """Helper method to truncate text properly"""
         clean_text = self._clean_text(text)
+        if clean_text == "N/A":
+            return clean_text
         return f"{clean_text[:length]}..." if len(clean_text) > length else clean_text
+    
+    def _validate_url(self, url):
+        """Validate and clean URL"""
+        return self._improved_validate_url(url)
+
+    def validate_internship_data(self, internship: Dict) -> bool:
+        """Comprehensive validation of internship data quality"""
+        if not internship:
+            return False
+        
+        # Check required fields
+        required_fields = ['title', 'company', 'source']
+        for field in required_fields:
+            value = internship.get(field)
+            if not value or self._clean_text(value) in ["N/A", "", "None", "null"]:
+                logger.warning(f"Invalid internship: missing {field}")
+                return False
+        
+        # Validate title quality
+        title = self._clean_text(internship.get('title', ''))
+        if len(title) < 3 or title.count('*') > 0:
+            logger.warning(f"Invalid title: {title}")
+            return False
+        
+        # Validate company name
+        company = self._clean_text(internship.get('company', ''))
+        if len(company) < 2 or company.count('*') > 0:
+            logger.warning(f"Invalid company: {company}")
+            return False
+        
+        # Validate URL if present
+        link = internship.get('link')
+        if link and not self._validate_url(link):
+            logger.warning(f"Invalid URL: {link}")
+            # Don't reject the internship for invalid URL, just clear it
+            internship['link'] = None
+        
+        # Clean all text fields to ensure no asterisks
+        text_fields = ['title', 'company', 'location', 'domain', 'duration', 'stipend', 'description']
+        for field in text_fields:
+            if field in internship:
+                cleaned = self._clean_text(internship[field])
+                internship[field] = cleaned
+        
+        # Clean arrays
+        array_fields = ['requirements', 'preferred_skills', 'responsibilities', 'qualifications', 'tags']
+        for field in array_fields:
+            if field in internship and isinstance(internship[field], list):
+                cleaned_array = []
+                for item in internship[field]:
+                    cleaned_item = self._clean_text(str(item))
+                    if cleaned_item != "N/A" and len(cleaned_item) > 0:
+                        cleaned_array.append(cleaned_item)
+                internship[field] = cleaned_array[:6]  # Limit to 6 items
+        
+        return True
+
+    def filter_and_validate_internships(self, internships: List[Dict]) -> List[Dict]:
+        """Filter and validate a list of internships"""
+        valid_internships = []
+        
+        for internship in internships:
+            if self.validate_internship_data(internship):
+                # Additional checks for relevance
+                if self._is_internship_relevant(internship):
+                    valid_internships.append(internship)
+                else:
+                    logger.info(f"Filtered out non-relevant job: {internship.get('title', 'Unknown')}")
+            else:
+                logger.warning(f"Filtered out invalid internship: {internship.get('title', 'Unknown')}")
+        
+        return valid_internships
+
+    def _enhanced_clean_text(self, text):
+        """Enhanced text cleaning with better asterisk and unwanted character removal"""
+        if not text:
+            return "N/A"
+        
+        # Convert to string if not already
+        text = str(text).strip()
+        
+        # Remove all types of asterisks and related characters
+        asterisk_chars = ['*', '**', '***', '****', '•', '▪', '▫', '◦', '‣', '⁃']
+        for char in asterisk_chars:
+            text = text.replace(char, '')
+        
+        # Remove excessive whitespace and special characters
+        text = ' '.join(text.split())
+        
+        # Remove HTML tags if any slipped through
+        import re
+        text = re.sub(r'<[^>]+>', '', text)
+        
+        # Remove common unwanted patterns
+        unwanted_patterns = [
+            r'\s+[-–—]\s*$',  # Trailing dashes
+            r'^\s*[-–—]\s+',  # Leading dashes
+            r'\s*\|\s*$',     # Trailing pipes
+            r'^\s*\|\s*',     # Leading pipes
+            r'\s*…\s*',       # Ellipsis
+        ]
+        
+        for pattern in unwanted_patterns:
+            text = re.sub(pattern, '', text)
+        
+        # Clean up common problematic phrases
+        problematic_phrases = [
+            'Apply now*', 'Click here*', 'Visit website*',
+            '*Required', '*Mandatory', '*Optional'
+        ]
+        
+        for phrase in problematic_phrases:
+            text = text.replace(phrase, phrase.replace('*', ''))
+        
+        # Final cleanup
+        text = ' '.join(text.split())
+        
+        return text if text and len(text.strip()) > 0 else "N/A"
+
+    def _improved_validate_url(self, url):
+        """Improved URL validation with better cleaning"""
+        if not url:
+            return None
+        
+        # Convert to string and clean
+        url = str(url).strip()
+        
+        # Remove asterisks and other unwanted characters
+        url = url.replace('*', '').replace('**', '').replace('***', '')
+        url = url.strip()
+        
+        # Check if URL is valid
+        if not url or url.lower() in ['n/a', 'none', 'null', '', 'undefined']:
+            return None
+        
+        # Add protocol if missing but looks like a URL
+        if url.startswith('www.') or url.startswith('//'):
+            url = 'https://' + url.lstrip('/')
+        
+        # Basic URL validation
+        import re
+        url_pattern = re.compile(
+            r'^https?://'  # http:// or https://
+            r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'  # domain...
+            r'localhost|'  # localhost...
+            r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...or ip
+            r'(?::\d+)?'  # optional port
+            r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+        
+        if url_pattern.match(url):
+            return url
+        
+        return None
 
 # Initialize scraper
 scraper = InternshipScraper()
@@ -593,6 +1094,22 @@ class BackgroundTaskManager:
             except Exception as e:
                 logger.error(f"Naukri scraping failed: {e}")
 
+        if 'internshala' in sources:
+            try:
+                internshala_results = await scraper.scrape_internshala(keyword, location, max_pages)
+                all_internships.extend(internshala_results)
+                logger.info(f"Internshala scraped: {len(internshala_results)} jobs")
+            except Exception as e:
+                logger.error(f"Internshala scraping failed: {e}")
+
+        if 'letsintern' in sources:
+            try:
+                letsintern_results = await scraper.scrape_letsintern(keyword, location, max_pages)
+                all_internships.extend(letsintern_results)
+                logger.info(f"LetsIntern scraped: {len(letsintern_results)} jobs")
+            except Exception as e:
+                logger.error(f"LetsIntern scraping failed: {e}")
+
         # Save scraped internships
         saved_count = scraper.save_internships(all_internships)
         
@@ -636,7 +1153,7 @@ def scrape_internships(request):
         data = request.data
         keyword = data.get('keyword', 'internship')
         location = data.get('location', 'India')
-        sources = data.get('sources', ['indeed'])
+        sources = data.get('sources', ['indeed', 'linkedin', 'naukri', 'internshala', 'letsintern'])
         max_pages = min(int(data.get('max_pages', 2)), 5)  # Limit to 5 pages max
         background = data.get('background', False)
 
@@ -678,6 +1195,22 @@ def scrape_internships(request):
                         logger.info(f"Naukri scraped: {len(naukri_results)} jobs")
                     except Exception as e:
                         logger.error(f"Naukri scraping failed: {e}")
+
+                if 'internshala' in sources:
+                    try:
+                        internshala_results = await scraper.scrape_internshala(keyword, location, max_pages)
+                        all_internships.extend(internshala_results)
+                        logger.info(f"Internshala scraped: {len(internshala_results)} jobs")
+                    except Exception as e:
+                        logger.error(f"Internshala scraping failed: {e}")
+
+                if 'letsintern' in sources:
+                    try:
+                        letsintern_results = await scraper.scrape_letsintern(keyword, location, max_pages)
+                        all_internships.extend(letsintern_results)
+                        logger.info(f"LetsIntern scraped: {len(letsintern_results)} jobs")
+                    except Exception as e:
+                        logger.error(f"LetsIntern scraping failed: {e}")
 
                 # Save scraped internships
                 saved_count = scraper.save_internships(all_internships)

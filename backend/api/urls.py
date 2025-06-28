@@ -25,6 +25,11 @@ urlpatterns = [
     path('scrape/clean-expired/', scrap.clean_expired_internships, name='clean_expired_internships'),
     path('scrape/stats/', scrap.get_scraping_stats, name='get_scraping_stats'),
     
+    # User scraping preferences
+    path('scraping/preferences/', views.user_scraping_preferences, name='user_scraping_preferences'),
+    path('scraping/user-scrape/', views.scrape_with_user_preferences, name='scrape_with_user_preferences'),
+    path('scraping/platform-stats/', views.get_platform_statistics, name='get_platform_statistics'),
+    
     # Analysis history endpoints
     path('analysis/history/', views.get_analysis_history, name='get_analysis_history'),
     path('analysis/statistics/', views.get_analysis_statistics, name='get_analysis_statistics'),

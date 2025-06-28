@@ -31,8 +31,7 @@ def ensure_connection(func):
                             return {
                                 "total_analyses": 0,
                                 "avg_readiness_score": 0.0,
-                                "total_internships_matched": 0,
-                                "total_gaps_detected": 0,
+                                "total_internships_matched": 0,                                "total_gaps_detected": 0,
                                 "last_analysis_date": None,
                                 "has_github_analyses": 0
                             }
@@ -49,6 +48,7 @@ def ensure_connection(func):
                     return func(self, *args, **kwargs)
                 except Exception as e:
                     logger.error(f"❌ Function {func.__name__} failed: {str(e)}")
+                    logger.error(f"❌ Function signature: args={args}, kwargs={kwargs}")
                     # Return defaults for specific functions
                     if func.__name__ == 'get_analysis_statistics':
                         return {

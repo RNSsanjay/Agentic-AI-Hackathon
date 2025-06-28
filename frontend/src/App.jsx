@@ -12,6 +12,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import ProtectedRoute from './components/ProtectedRoute';
 
+
 // Component to handle routing based on auth state
 const AppRoutes = () => {
     const { isAuthenticated, loading } = useAuth();
@@ -77,29 +78,31 @@ const AppRoutes = () => {
 
 function App() {
     return (
-        <AuthProvider>
-            <Router>
-                <div className="App">
-                    <AppRoutes />
-                    <Toaster
-                        position="top-right"
-                        toastOptions={{
-                            duration: 4000,
-                            style: {
-                                background: '#363636',
-                                color: '#fff',
-                            },
-                            success: {
-                                duration: 3000,
-                                theme: {
-                                    primary: '#4aed88',
+        
+            <AuthProvider>
+                <Router>
+                    <div className="App">
+                        <AppRoutes />
+                        
+                        <Toaster
+                            position="top-right"
+                            toastOptions={{
+                                duration: 4000,
+                                style: {
+                                    background: '#363636',
+                                    color: '#fff',
                                 },
-                            },
-                        }}
-                    />
-                </div>
-            </Router>
-        </AuthProvider>
+                                success: {
+                                    duration: 3000,
+                                    theme: {
+                                        primary: '#4aed88',
+                                    },
+                                },
+                            }}
+                        />
+                    </div>
+                </Router>
+            </AuthProvider>
     );
 }
 
