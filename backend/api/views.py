@@ -1067,300 +1067,269 @@ def get_recent_activity(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_analysis_history(request):
-    """Get analysis history for user"""
+    """Get analysis history from MongoDB"""
     try:
-        # Get user from JWT token if provided
-        auth_header = request.headers.get('Authorization')
-        user_id = None
+        # Get query parameters with defaults
+        user_id = request.GET.get('user_id')
+        limit = min(int(request.GET.get('limit', 20)), 100)  # Maximum 100 results per request
+        skip = max(int(request.GET.get('skip', 0)), 0)  # Ensure non-negative
+        search = request.GET.get('search', '').strip()
         
-        if auth_header and auth_header.startswith('Bearer '):
-            try:
-                token = auth_header.split(' ')[1]
-                payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-                user_id = payload.get('user_id')
-            except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
-                pass  # Continue with anonymous access
-        
-        if MONGODB_AVAILABLE and mongodb_service:
-            try:
-                # Test connection first
-                if not mongodb_service.is_connected():
-                    logger.info("MongoDB not connected, attempting to connect...")
-                    mongodb_service.connect()
-                
-                if mongodb_service.is_connected():
-                    # Get parameters
-                    limit = int(request.GET.get('limit', 10))
-                    skip = int(request.GET.get('skip', 0))
-                    search = request.GET.get('search', '')
-                    
-                    # Fetch from MongoDB
-                    history_data = mongodb_service.get_analysis_history(
-                        user_id=user_id,
-                        limit=limit, 
-                        skip=skip, 
-                        search_term=search
-                    )
-                    
-                    if history_data:
-                        return Response({
-                            'status': 'success',
-                            'analyses': history_data.get('analyses', []),
-                            'total_count': history_data.get('total_count', 0),
-                            'statistics': history_data.get('statistics', {}),
-                            'using_mongodb': True,
-                            'connection_status': 'connected'
-                        })
-                    else:
-                        logger.warning("MongoDB connected but no history data returned")
-                else:
-                    logger.warning("MongoDB connection failed")
-            except Exception as e:
-                logger.error(f"MongoDB operation failed: {str(e)}")
-        
-        # Return empty data with helpful message
-        return Response({
+        # Default response structure
+        default_response = {
             'status': 'success',
             'analyses': [],
-            'total_count': 0,
             'statistics': {
                 'total_analyses': 0,
                 'avg_readiness_score': 0,
-                'highest_score': 0,
-                'lowest_score': 0,
-                'last_analysis': None,
-                'total_recommendations': 0,
-                'skill_progression': [],
-                'analysis_trends': {
-                    'this_month': 0,
-                    'last_month': 0,
-                    'growth_rate': 0
-                },
-                'top_skills': [],
-                'improvement_areas': []
+                'total_internships_matched': 0,
+                'total_gaps_detected': 0,
+                'has_github_analyses': 0
             },
-            'using_mongodb': MONGODB_AVAILABLE,
-            'connection_status': 'connected' if MONGODB_AVAILABLE and mongodb_service and mongodb_service.is_connected() else 'disconnected',
-            'message': 'No analysis history found. Upload your DOCX resume to get started!' if not user_id else 'No analyses found for this user. Start by uploading a resume!'
-        })
-    
+            'pagination': {
+                'limit': limit,
+                'skip': skip,
+                'total': 0
+            }
+        }
+        
+        if not MONGODB_AVAILABLE or not mongodb_service:
+            return Response(default_response, status=status.HTTP_200_OK)
+        
+        # Check if MongoDB connection is available
+        if not mongodb_service.is_connected():
+            mongodb_service.connect()
+        
+        if not mongodb_service.is_connected():
+            return Response(default_response, status=status.HTTP_200_OK)
+        
+        try:
+            if search:
+                # Search analyses
+                result = mongodb_service.search_analyses(search, user_id, limit)
+                if isinstance(result, list):
+                    # Old format compatibility
+                    analyses = result
+                    stats = mongodb_service.get_analysis_statistics(user_id)
+                    total_count = len(analyses)
+                else:
+                    # New format
+                    analyses = result.get('analyses', [])
+                    stats = result.get('statistics', {})
+                    total_count = result.get('total_count', len(analyses))
+            else:
+                # Get regular history
+                result = mongodb_service.get_analysis_history(user_id, limit, skip, search)
+                if isinstance(result, dict):
+                    # New format
+                    analyses = result.get('analyses', [])
+                    stats = result.get('statistics', {})
+                    total_count = result.get('total_count', len(analyses))
+                else:
+                    # Old format compatibility (shouldn't happen with updated method)
+                    analyses = result if isinstance(result, list) else []
+                    stats = mongodb_service.get_analysis_statistics(user_id)
+                    total_count = len(analyses)
+            
+            # Ensure we return valid data even if MongoDB fails
+            if not isinstance(analyses, list):
+                analyses = []
+            
+            if not isinstance(stats, dict):
+                stats = default_response['statistics']
+            
+            return Response({
+                'status': 'success',
+                'analyses': analyses,
+                'statistics': stats,
+                'pagination': {
+                    'limit': limit,
+                    'skip': skip,
+                    'total': total_count
+                }
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as mongo_error:
+            # Log the specific MongoDB error but return a friendly response
+            print(f"MongoDB operation failed: {str(mongo_error)}")
+            return Response({
+                **default_response,
+                'warning': 'Database temporarily unavailable'
+            }, status=status.HTTP_200_OK)
+        
     except Exception as e:
-        logger.error(f"Error in get_analysis_history: {str(e)}")
+        print(f"Analysis history error: {str(e)}")
+        return Response({
+            'status': 'success',  # Return success to prevent frontend errors
+            'analyses': [],
+            'statistics': {
+                'total_analyses': 0,
+                'avg_readiness_score': 0,
+                'total_internships_matched': 0,
+                'total_gaps_detected': 0,
+                'has_github_analyses': 0
+            },
+            'pagination': {
+                'limit': 20,
+                'skip': 0,
+                'total': 0
+            },
+            'warning': 'Service temporarily unavailable'
+        }, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_analysis_by_id(request, analysis_id):
+    """Get specific analysis by ID"""
+    try:
+        if not MONGODB_AVAILABLE or not mongodb_service:
+            return Response({
+                'status': 'error',
+                'message': 'MongoDB service not available'
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        
+        analysis = mongodb_service.get_analysis_by_id(analysis_id)
+        
+        if analysis:
+            return Response({
+                'status': 'success',
+                'analysis': analysis
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'status': 'error',
+                'message': 'Analysis not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+            
+    except Exception as e:
         return Response({
             'status': 'error',
-            'error': f'Failed to get analysis history: {str(e)}',
-            'analyses': [],
-            'total_count': 0,
-            'using_mongodb': MONGODB_AVAILABLE,
-            'connection_status': 'error'
+            'message': f'Failed to retrieve analysis: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['DELETE'])
+@permission_classes([AllowAny])
+def delete_analysis(request, analysis_id):
+    """Delete specific analysis by ID"""
+    try:
+        if not MONGODB_AVAILABLE or not mongodb_service:
+            return Response({
+                'status': 'error',
+                'message': 'MongoDB service not available'
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        
+        success = mongodb_service.delete_analysis(analysis_id)
+        
+        if success:
+            return Response({
+                'status': 'success',
+                'message': 'Analysis deleted successfully'
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'status': 'error',
+                'message': 'Analysis not found or could not be deleted'
+            }, status=status.HTTP_404_NOT_FOUND)
+            
+    except Exception as e:
+        return Response({
+            'status': 'error',
+            'message': f'Failed to delete analysis: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_analysis_statistics(request):
-    """Get analysis statistics for user"""
+    """Get analysis statistics"""
     try:
-        if MONGODB_AVAILABLE and mongodb_service:
-            # Get stats from MongoDB
-            stats = mongodb_service.get_analysis_statistics()
-            if stats:
-                return Response({
-                    'status': 'success',
-                    'statistics': stats,
-                    'using_mongodb': True
-                })
-        
-        # Fallback to computed statistics
-        statistics = {
-            'total_analyses': 1,
-            'avg_readiness_score': 85,
-            'highest_score': 88,
-            'lowest_score': 82,
-            'top_skills': ['Python', 'React', 'JavaScript', 'Machine Learning'],
-            'improvement_areas': ['Cloud Computing', 'DevOps', 'System Design'],
-            'analysis_trends': {
-                'this_month': 1,
-                'last_month': 0,
-                'growth_rate': 100
-            },
-            'domain_preferences': ['Web Development', 'Data Science', 'AI/ML'],
-            'last_analysis_date': '2024-06-27T10:30:00Z'
-        }
-        
-        return Response({
-            'status': 'success',
-            'statistics': statistics,
-            'using_mongodb': False
-        })
-    
-    except Exception as e:
-        logger.error(f"Error in get_analysis_statistics: {str(e)}")
-        return Response({
-            'status': 'error',
-            'error': f'Failed to get analysis statistics: {str(e)}',
-            'statistics': {}
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-@api_view(['GET'])
-def get_analysis_by_id(request, analysis_id):
-    """Get specific analysis by ID"""
-    try:
-        if MONGODB_AVAILABLE and mongodb_service:
-            analysis = mongodb_service.get_analysis_by_id(analysis_id)
-            if analysis:
-                return Response({
-                    'status': 'success',
-                    'analysis': analysis
-                })
-        
-        # Mock detailed analysis for demo
-        current_time = datetime.now()
-        mock_analysis = {
-            'analysis_id': analysis_id,
-            'timestamp': (current_time - timedelta(days=1)).isoformat(),
-            'overall_readiness_score': 85,
-            'student_profile': {
-                'name': 'Sample User',
-                'email': 'user@example.com',
-                'skills': ['Python', 'React', 'JavaScript', 'Machine Learning'],
-                'domains': ['Web Development', 'Data Science'],
-                'experience_level': 'Intermediate'
-            },
-            'readiness_evaluations': [{
-                'readiness_score': 0.85,
-                'internship_title': 'Software Engineer Intern',
-                'company': 'Tech Corp',
-                'strengths': ['Strong programming skills', 'Good project portfolio'],
-                'improvement_areas': ['System design', 'Cloud computing']
-            }],
-            'internship_recommendations': [
-                {
-                    'title': 'Software Engineer Intern',
-                    'company': 'Tech Corp',
-                    'domain': 'Software Engineering',
-                    'location': 'San Francisco, CA',
-                    'matching_score': 0.92,
-                    'justification': 'Strong skill match with Python and React'
-                },
-                {
-                    'title': 'Data Science Intern', 
-                    'company': 'AI Startup',
-                    'domain': 'Data Science',
-                    'location': 'New York, NY',
-                    'matching_score': 0.87,
-                    'justification': 'Machine learning experience aligns well'
-                }
-            ],
-            'portfolio_gaps': [
-                {
-                    'title': 'Cloud Computing Experience',
-                    'priority': 'high',
-                    'description': 'Add AWS or Azure projects to demonstrate cloud computing skills'
-                },
-                {
-                    'title': 'DevOps Skills',
-                    'priority': 'medium',
-                    'description': 'Learn Docker and CI/CD pipelines'
-                }
-            ],
-            'github_analysis': {
-                'username': 'sampleuser',
-                'public_repos': 8,
-                'total_commits': 142,
-                'github_score': 78,
-                'languages': ['Python', 'JavaScript', 'TypeScript'],
-                'most_starred_repo': 'ml-project'
-            },
-            'analysis_summary': 'Strong technical foundation with good programming skills. Focus on cloud computing and system design for improvement.'
-        }
-        
-        return Response({
-            'status': 'success',
-            'analysis': mock_analysis
-        })
-    
-    except Exception as e:
-        logger.error(f"Error in get_analysis_by_id: {str(e)}")
-        return Response({
-            'status': 'error',
-            'error': f'Failed to get analysis: {str(e)}'
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-@api_view(['DELETE'])
-def delete_analysis(request, analysis_id):
-    """Delete specific analysis by ID"""
-    try:
-        # Get user from JWT token
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
+        if not MONGODB_AVAILABLE or not mongodb_service:
+            # Return default statistics when MongoDB is not available
             return Response({
-                'status': 'error',
-                'error': 'Authentication required'
-            }, status=status.HTTP_401_UNAUTHORIZED)
+                'status': 'success',
+                'statistics': {
+                    'total_analyses': 0,
+                    'avg_readiness_score': 0.0,
+                    'total_internships_matched': 0,
+                    'total_gaps_detected': 0,
+                    'last_analysis_date': None,
+                    'has_github_analyses': 0
+                }
+            }, status=status.HTTP_200_OK)
         
-        try:
-            token = auth_header.split(' ')[1]
-            payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-            user_id = payload.get('user_id')
-        except (jwt.ExpiredSignatureError, jwt.InvalidTokenError) as e:
+        user_id = request.GET.get('user_id')
+        
+        # Check if MongoDB connection is available
+        if not mongodb_service.is_connected():
+            mongodb_service.connect()
+        
+        if not mongodb_service.is_connected():
+            # Return default statistics if connection fails
             return Response({
-                'status': 'error',
-                'error': 'Invalid or expired token'
-            }, status=status.HTTP_401_UNAUTHORIZED)
+                'status': 'success',
+                'statistics': {
+                    'total_analyses': 0,
+                    'avg_readiness_score': 0.0,
+                    'total_internships_matched': 0,
+                    'total_gaps_detected': 0,
+                    'last_analysis_date': None,
+                    'has_github_analyses': 0
+                }
+            }, status=status.HTTP_200_OK)
         
-        if MONGODB_AVAILABLE and mongodb_service:
-            result = mongodb_service.delete_analysis(analysis_id, user_id)
-            if result:
-                return Response({
-                    'status': 'success',
-                    'message': 'Analysis deleted successfully'
-                })
+        stats = mongodb_service.get_analysis_statistics(user_id)
         
-        # For mock data, always return success
         return Response({
             'status': 'success',
-            'message': 'Analysis deleted successfully (mock data)'
-        })
-    
+            'statistics': stats
+        }, status=status.HTTP_200_OK)
+        
     except Exception as e:
-        logger.error(f"Error in delete_analysis: {str(e)}")
+        # Return default statistics instead of error
         return Response({
-            'status': 'error',
-            'error': f'Failed to delete analysis: {str(e)}'
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            'status': 'success',
+            'statistics': {
+                'total_analyses': 0,
+                'avg_readiness_score': 0.0,
+                'total_internships_matched': 0,
+                'total_gaps_detected': 0,
+                'last_analysis_date': None,
+                'has_github_analyses': 0
+            }
+        }, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def test_mongodb_connection(request):
-    """Test MongoDB connection"""
+    """Test MongoDB connection and return diagnostics"""
     try:
-        if MONGODB_AVAILABLE and mongodb_service:
-            # Test connection
-            is_connected = mongodb_service.is_connected()
-            if not is_connected:
-                mongodb_service.connect()
-                is_connected = mongodb_service.is_connected()
-            
+        if not MONGODB_AVAILABLE or not mongodb_service:
+            return Response({
+                'status': 'error',
+                'message': 'MongoDB service not available',
+                'details': 'MongoDB service could not be imported'
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        
+        # Test the connection
+        connection_test = mongodb_service.test_connection()
+        
+        if connection_test['connected']:
             return Response({
                 'status': 'success',
-                'mongodb_available': MONGODB_AVAILABLE,
-                'connected': is_connected,
-                'message': 'MongoDB connection successful' if is_connected else 'MongoDB connection failed'
-            })
+                'message': 'MongoDB connection successful',
+                'details': connection_test
+            }, status=status.HTTP_200_OK)
         else:
             return Response({
                 'status': 'error',
-                'mongodb_available': False,
-                'connected': False,
-                'message': 'MongoDB service not available'
-            })
+                'message': 'MongoDB connection failed',
+                'details': connection_test
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            
     except Exception as e:
-        logger.error(f"Error testing MongoDB connection: {str(e)}")
         return Response({
             'status': 'error',
-            'error': str(e),
-            'mongodb_available': MONGODB_AVAILABLE,
-            'connected': False
+            'message': f'MongoDB test failed: {str(e)}',
+            'details': {'error': str(e)}
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET', 'PUT'])
