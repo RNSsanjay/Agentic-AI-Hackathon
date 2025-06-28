@@ -35,6 +35,11 @@ const AnalysisHistory = () => {
                 url += `&search=${encodeURIComponent(searchTerm.trim())}`;
             }
 
+            // Add filter parameter
+            if (filterType !== 'all') {
+                url += `&filter=${filterType}`;
+            }
+
             const response = await axios.get(url);
 
             if (response.data.status === 'success') {
@@ -49,6 +54,7 @@ const AnalysisHistory = () => {
                     console.log('No analyses found - using empty state');
                 } else if (analyses.length > 0) {
                     console.log(`Loaded ${analyses.length} analyses`);
+                    toast.success(`Loaded ${analyses.length} analysis reports`);
                 }
             } else {
                 console.warn('Analysis history response:', response.data);
@@ -86,19 +92,21 @@ const AnalysisHistory = () => {
         } catch (error) {
             console.error('Error fetching statistics:', error);
         }
-    };
-
-    const fetchAnalysisDetails = async (analysisId) => {
+    }; const fetchAnalysisDetails = async (analysisId) => {
         try {
+            setLoading(true);
             const response = await axios.get(`http://127.0.0.1:8000/api/analysis/${analysisId}/`);
             if (response.data.status === 'success') {
                 setSelectedAnalysis(response.data.analysis);
+                toast.success('Full analysis report loaded successfully');
             } else {
-                toast.error('Failed to fetch analysis details');
+                toast.error('Failed to fetch complete analysis details');
             }
         } catch (error) {
             console.error('Error fetching analysis details:', error);
-            toast.error('Failed to load analysis details');
+            toast.error('Failed to load complete analysis report');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -121,15 +129,36 @@ const AnalysisHistory = () => {
             toast.error('Failed to delete analysis');
         }
     }; const exportAnalysis = (analysis) => {
-        const dataStr = JSON.stringify(analysis, null, 2);
-        const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-        const exportFileDefaultName = `analysis_${analysis.analysis_id}_${new Date(analysis.timestamp).toISOString().split('T')[0]}.json`;
+        try {
+            // Create a more detailed export with proper formatting
+            const exportData = {
+                analysisId: analysis.analysis_id,
+                exportDate: new Date().toISOString(),
+                studentProfile: analysis.student_profile,
+                overallScore: analysis.overall_readiness_score,
+                internshipRecommendations: analysis.internship_recommendations,
+                portfolioGaps: analysis.portfolio_gaps,
+                readinessEvaluations: analysis.readiness_evaluations,
+                githubAnalysis: analysis.github_analysis,
+                agentCommunications: analysis.agent_communications,
+                timestamp: analysis.timestamp,
+                summary: analysis.analysis_summary
+            };
 
-        const linkElement = document.createElement('a');
-        linkElement.setAttribute('href', dataUri);
-        linkElement.setAttribute('download', exportFileDefaultName);
-        linkElement.click();
-        toast.success('Analysis exported successfully');
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+            const exportFileDefaultName = `InternAI_Analysis_Report_${analysis.analysis_id}_${new Date(analysis.timestamp).toISOString().split('T')[0]}.json`;
+
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+
+            toast.success('Complete analysis report exported successfully!');
+        } catch (error) {
+            console.error('Export error:', error);
+            toast.error('Failed to export analysis report');
+        }
     };
 
     const getScoreColor = (score) => {
@@ -567,8 +596,7 @@ const AnalysisCard = ({ analysis, index, onView, onDelete, onExport }) => {
                         whileHover={{ scale: 1.05, y: -1 }}
                         whileTap={{ scale: 0.95 }}
                         className="flex items-center px-3 py-2 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 transition-all"
-                    >
-                        <Trash2 className="w-4 h-4" />
+                    >                        <Trash2 className="w-4 h-4" />
                     </motion.button>
                 </div>
             </div>
@@ -576,12 +604,12 @@ const AnalysisCard = ({ analysis, index, onView, onDelete, onExport }) => {
     );
 };
 
-// Analysis Details Modal Component
+// Analysis Details Modal Component - Complete Implementation
 const AnalysisDetailsModal = ({ analysis, onClose }) => {
     if (!analysis) return null;
 
     const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleDateString('en-US', {
+        return new Date(dateString).toLocaleString('en-US', {
             year: 'numeric',
             month: 'long',
             day: 'numeric',
@@ -590,171 +618,370 @@ const AnalysisDetailsModal = ({ analysis, onClose }) => {
         });
     };
 
+    const getScoreColor = (score) => {
+        if (score >= 80) return 'text-green-600';
+        if (score >= 60) return 'text-amber-600';
+        return 'text-red-600';
+    };
+
+    const exportCurrentAnalysis = () => {
+        try {
+            const exportData = {
+                analysisId: analysis.analysis_id,
+                exportDate: new Date().toISOString(),
+                fullReport: analysis,
+                summary: {
+                    studentName: analysis.student_profile?.name || 'Anonymous',
+                    overallScore: analysis.overall_readiness_score,
+                    totalRecommendations: analysis.internship_recommendations?.length || 0,
+                    totalGaps: analysis.portfolio_gaps?.length || 0,
+                    analysisDate: analysis.timestamp
+                }
+            };
+
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+            const exportFileDefaultName = `InternAI_Complete_Report_${analysis.analysis_id}.json`;
+
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+
+            toast.success('Complete report exported successfully!');
+        } catch (error) {
+            console.error('Export error:', error);
+            toast.error('Failed to export complete report');
+        }
+    };
+
     return (
         <AnimatePresence>
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
                 onClick={onClose}
-            >                <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                className="bg-white border border-blue-200 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl"
-                onClick={(e) => e.stopPropagation()}
-            >                    <div className="p-6 border-b border-blue-200 bg-gradient-to-r from-blue-50 to-purple-100">
+            >
+                <motion.div
+                    initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                    className="bg-white rounded-3xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {/* Modal Header */}
+                    <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
                         <div className="flex items-center justify-between">
-                            <h2 className="text-2xl font-bold text-blue-800">Analysis Details</h2>
-                            <motion.button
-                                onClick={onClose}
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
-                                className="text-blue-500 hover:text-blue-700 transition-colors text-xl"
-                            >
-                                ✕
-                            </motion.button>
+                            <div>
+                                <h2 className="text-2xl font-bold mb-2">Complete Analysis Report</h2>
+                                <p className="text-blue-100">
+                                    {analysis.student_profile?.name || 'Anonymous User'} • {formatDate(analysis.timestamp)}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="text-center">
+                                    <div className={`text-3xl font-bold ${getScoreColor(analysis.overall_readiness_score || 0)} bg-white px-4 py-2 rounded-xl`}>
+                                        {analysis.overall_readiness_score || 0}%
+                                    </div>
+                                    <div className="text-sm text-blue-100 mt-1">Overall Score</div>
+                                </div>
+                                <motion.button
+                                    onClick={exportCurrentAnalysis}
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    className="flex items-center px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl transition-all"
+                                >
+                                    <Download className="w-4 h-4 mr-2" />
+                                    Export Report
+                                </motion.button>
+                                <motion.button
+                                    onClick={onClose}
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    className="flex items-center px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl transition-all"
+                                >
+                                    ✕
+                                </motion.button>
+                            </div>
                         </div>
-                        <p className="text-blue-600 mt-1 font-medium">
-                            Analysis from {formatDate(analysis.timestamp)}
-                        </p>
                     </div>
 
-                    <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-                        {/* Student Profile Section */}                        <div className="mb-8">
-                            <h3 className="text-xl font-bold text-blue-800 mb-4">Student Profile</h3>
-                            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                    <div>
-                                        <p className="text-blue-600 text-sm font-semibold">Name</p>
-                                        <p className="text-blue-800 font-medium">{analysis.student_profile?.name || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-blue-600 text-sm font-semibold">Experience Level</p>
-                                        <p className="text-blue-800 capitalize font-medium">{analysis.student_profile?.experience_level || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-blue-600 text-sm font-semibold">Email</p>
-                                        <p className="text-blue-800 font-medium">{analysis.student_profile?.email || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-blue-600 text-sm font-semibold">Overall Readiness</p>
-                                        <p className="text-purple-600 font-bold text-lg">{analysis.overall_readiness_score}%</p>
-                                    </div>
-                                </div>                                {analysis.student_profile?.skills && (
-                                    <div className="mb-4">
-                                        <p className="text-blue-600 text-sm mb-2 font-semibold">Skills</p>
-                                        <div className="flex flex-wrap gap-2">
-                                            {analysis.student_profile.skills.map((skill, index) => (
-                                                <span
-                                                    key={index}
-                                                    className="px-3 py-1 bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700 text-sm rounded-full border border-blue-200 font-medium"
-                                                >
-                                                    {skill}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}                                {analysis.github_analysis && (
-                                    <div>
-                                        <p className="text-blue-600 text-sm mb-2 font-semibold">GitHub Analysis</p>
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                                            <div>
-                                                <p className="text-blue-500">Username</p>
-                                                <p className="text-blue-800 font-medium">{analysis.github_analysis.username}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-blue-500">Public Repos</p>
-                                                <p className="text-blue-800 font-medium">{analysis.github_analysis.public_repos}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-blue-500">GitHub Score</p>
-                                                <p className="text-blue-800 font-medium">{analysis.github_analysis.github_score}/100</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
+                    {/* Modal Content */}
+                    <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                        <div className="space-y-8">
+                            {/* Summary Statistics */}
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-2xl p-4 text-center">
+                                    <Target className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                                    <div className="text-2xl font-bold text-blue-800">{analysis.internship_recommendations?.length || 0}</div>
+                                    <div className="text-sm text-blue-600">Recommendations</div>
+                                </div>
+                                <div className="bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200 rounded-2xl p-4 text-center">
+                                    <AlertCircle className="w-8 h-8 text-orange-600 mx-auto mb-2" />
+                                    <div className="text-2xl font-bold text-orange-800">{analysis.portfolio_gaps?.length || 0}</div>
+                                    <div className="text-sm text-orange-600">Portfolio Gaps</div>
+                                </div>
+                                <div className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-2xl p-4 text-center">
+                                    <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                                    <div className="text-2xl font-bold text-green-800">{analysis.readiness_evaluations?.length || 0}</div>
+                                    <div className="text-sm text-green-600">Evaluations</div>
+                                </div>
+                                <div className="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-2xl p-4 text-center">
+                                    <Github className="w-8 h-8 text-purple-600 mx-auto mb-2" />
+                                    <div className="text-2xl font-bold text-purple-800">{analysis.github_analysis ? 'Yes' : 'No'}</div>
+                                    <div className="text-sm text-purple-600">GitHub Analysis</div>
+                                </div>
                             </div>
-                        </div>                        {/* Internship Recommendations */}
-                        {analysis.internship_recommendations && analysis.internship_recommendations.length > 0 && (
-                            <div className="mb-8">
-                                <h3 className="text-xl font-bold text-blue-800 mb-4">
-                                    Internship Recommendations ({analysis.internship_recommendations.length})
-                                </h3>
-                                <div className="space-y-4">
-                                    {analysis.internship_recommendations.slice(0, 3).map((internship, index) => (
-                                        <div key={index} className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-4 hover:shadow-md transition-all">
-                                            <div className="flex items-start justify-between mb-2">
-                                                <h4 className="font-bold text-blue-800">{internship.title}</h4>
-                                                <span className="text-emerald-600 text-sm font-bold bg-emerald-100 px-2 py-1 rounded-full">
-                                                    {(internship.matching_score * 100).toFixed(0)}% match
-                                                </span>
+
+                            {/* Student Profile Section */}
+                            {analysis.student_profile && (
+                                <div className="bg-gradient-to-r from-blue-50 via-white to-purple-50 border border-blue-200 rounded-2xl p-6">
+                                    <h3 className="text-2xl font-bold text-blue-800 mb-6 flex items-center">
+                                        <User className="w-6 h-6 mr-3" />
+                                        Student Profile
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <h4 className="text-lg font-semibold text-blue-700 mb-3">Personal Information</h4>
+                                            <div className="space-y-2">
+                                                <div>
+                                                    <span className="text-sm text-gray-600">Name:</span>
+                                                    <p className="font-semibold text-lg text-blue-800">{analysis.student_profile.name || 'Not detected'}</p>
+                                                </div>
+                                                {analysis.student_profile.email && (
+                                                    <div>
+                                                        <span className="text-sm text-gray-600">Email:</span>
+                                                        <p className="text-blue-600">{analysis.student_profile.email}</p>
+                                                    </div>
+                                                )}
+                                                {analysis.student_profile.phone && (
+                                                    <div>
+                                                        <span className="text-sm text-gray-600">Phone:</span>
+                                                        <p className="text-blue-600">{analysis.student_profile.phone}</p>
+                                                    </div>
+                                                )}
+                                                <div>
+                                                    <span className="text-sm text-gray-600">Experience Level:</span>
+                                                    <p className="font-semibold capitalize text-green-600">
+                                                        {analysis.student_profile.experience_level || 'Entry-level'}
+                                                        {analysis.student_profile.years_of_experience && ` (${analysis.student_profile.years_of_experience} years)`}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <p className="text-purple-600 text-sm mb-2 font-medium">{internship.company} • {internship.location}</p>
-                                            {internship.justification && (
-                                                <p className="text-blue-700 text-sm font-medium">{internship.justification}</p>
+                                        </div>
+                                        <div>
+                                            <h4 className="text-lg font-semibold text-blue-700 mb-3">Skills & Technologies</h4>
+                                            {analysis.student_profile.skills && analysis.student_profile.skills.length > 0 && (
+                                                <div className="flex flex-wrap gap-2">
+                                                    {analysis.student_profile.skills.map((skill, index) => (
+                                                        <motion.span
+                                                            key={index}
+                                                            initial={{ opacity: 0, scale: 0.8 }}
+                                                            animate={{ opacity: 1, scale: 1 }}
+                                                            transition={{ delay: index * 0.05 }}
+                                                            className="px-3 py-1 bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700 text-sm rounded-full border border-blue-200 font-medium"
+                                                        >
+                                                            {skill}
+                                                        </motion.span>
+                                                    ))}
+                                                </div>
                                             )}
                                         </div>
-                                    ))}
-                                    {analysis.internship_recommendations.length > 3 && (
-                                        <p className="text-blue-600 text-sm font-medium">
-                                            +{analysis.internship_recommendations.length - 3} more recommendations available
-                                        </p>
+                                    </div>
+                                    {analysis.student_profile.summary && (
+                                        <div className="mt-6">
+                                            <h4 className="text-lg font-semibold text-blue-700 mb-3">Professional Summary</h4>
+                                            <p className="text-gray-700 bg-white/80 p-4 rounded-xl border border-blue-100 italic">
+                                                "{analysis.student_profile.summary}"
+                                            </p>
+                                        </div>
                                     )}
                                 </div>
-                            </div>
-                        )}                        {/* Portfolio Gaps */}
-                        {analysis.portfolio_gaps && analysis.portfolio_gaps.length > 0 && (
-                            <div className="mb-8">
-                                <h3 className="text-xl font-bold text-blue-800 mb-4">
-                                    Portfolio Gaps ({analysis.portfolio_gaps.length})
-                                </h3>
-                                <div className="space-y-3">
-                                    {analysis.portfolio_gaps.slice(0, 5).map((gap, index) => (
-                                        <div key={index} className="bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-xl p-4 hover:shadow-md transition-all">
-                                            <div className="flex items-start justify-between">
-                                                <h4 className="text-red-600 font-bold">{gap.title}</h4>
-                                                <span className={`text-xs px-3 py-1 rounded-full font-bold ${gap.priority === 'high' ? 'bg-red-100 text-red-600 border border-red-200' :
-                                                    gap.priority === 'medium' ? 'bg-orange-100 text-orange-600 border border-orange-200' :
-                                                        'bg-blue-100 text-blue-600 border border-blue-200'
-                                                    }`}>
-                                                    {gap.priority}
-                                                </span>
-                                            </div>
-                                            {gap.description && (
-                                                <p className="text-orange-700 text-sm mt-2 font-medium">{gap.description}</p>
-                                            )}
+                            )}
+
+                            {/* GitHub Analysis Section */}
+                            {analysis.github_analysis && (
+                                <div className="bg-gradient-to-r from-gray-50 via-white to-orange-50 border border-gray-200 rounded-2xl p-6">
+                                    <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                                        <Github className="w-6 h-6 mr-3" />
+                                        GitHub Analysis
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div className="text-center bg-white/80 p-4 rounded-xl border border-gray-200">
+                                            <p className="text-gray-600 text-sm">Username</p>
+                                            <p className="font-bold text-xl text-gray-800">{analysis.github_analysis.username}</p>
                                         </div>
-                                    ))}
-                                    {analysis.portfolio_gaps.length > 5 && (
-                                        <p className="text-red-600 text-sm font-medium">
-                                            +{analysis.portfolio_gaps.length - 5} more gaps identified
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        )}                        {/* Readiness Evaluations */}
-                        {analysis.readiness_evaluations && analysis.readiness_evaluations.length > 0 && (
-                            <div>
-                                <h3 className="text-xl font-bold text-blue-800 mb-4">Readiness Evaluations</h3>
-                                <div className="space-y-4">
-                                    {analysis.readiness_evaluations.map((evaluation, index) => (
-                                        <div key={index} className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-xl p-4 hover:shadow-md transition-all">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <h4 className="font-bold text-green-700">{evaluation.internship_title}</h4>
-                                                <span className="text-blue-600 font-bold text-lg bg-blue-100 px-3 py-1 rounded-full">
-                                                    {(evaluation.readiness_score * 100).toFixed(0)}%
-                                                </span>
-                                            </div>
-                                            {evaluation.company && (
-                                                <p className="text-green-600 text-sm font-medium">{evaluation.company}</p>
-                                            )}
+                                        <div className="text-center bg-white/80 p-4 rounded-xl border border-gray-200">
+                                            <p className="text-gray-600 text-sm">Public Repositories</p>
+                                            <p className="font-bold text-xl text-gray-800">{analysis.github_analysis.public_repos}</p>
                                         </div>
-                                    ))}
+                                        <div className="text-center bg-white/80 p-4 rounded-xl border border-gray-200">
+                                            <p className="text-gray-600 text-sm">GitHub Score</p>
+                                            <p className="font-bold text-xl text-green-600">{analysis.github_analysis.github_score}/100</p>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
+
+                            {/* Internship Recommendations */}
+                            {analysis.internship_recommendations && analysis.internship_recommendations.length > 0 && (
+                                <div className="bg-gradient-to-r from-green-50 via-white to-blue-50 border border-green-200 rounded-2xl p-6">
+                                    <h3 className="text-2xl font-bold text-green-800 mb-6 flex items-center">
+                                        <Target className="w-6 h-6 mr-3" />
+                                        Internship Recommendations ({analysis.internship_recommendations.length})
+                                    </h3>
+                                    <div className="space-y-4 max-h-96 overflow-y-auto">
+                                        {analysis.internship_recommendations.map((internship, index) => (
+                                            <motion.div
+                                                key={index}
+                                                initial={{ opacity: 0, y: 20 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: index * 0.1 }}
+                                                className="bg-white border border-green-200 rounded-xl p-4 hover:shadow-lg transition-all"
+                                            >
+                                                <div className="flex items-start justify-between mb-3">
+                                                    <div className="flex-1">
+                                                        <h4 className="font-bold text-lg text-green-800">{internship.title}</h4>
+                                                        <p className="text-green-600 font-medium">{internship.company}</p>
+                                                        {internship.location && (
+                                                            <p className="text-gray-600 text-sm">{internship.location}</p>
+                                                        )}
+                                                    </div>
+                                                    <span className="bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 px-4 py-2 rounded-full font-bold text-lg border border-emerald-300">
+                                                        {(internship.matching_score * 100).toFixed(0)}% match
+                                                    </span>
+                                                </div>
+                                                {internship.justification && (
+                                                    <p className="text-gray-700 text-sm bg-gray-50 p-3 rounded-lg italic border border-gray-200">
+                                                        {internship.justification}
+                                                    </p>
+                                                )}
+                                                <div className="flex items-center gap-4 mt-3 text-sm text-gray-600">
+                                                    {internship.duration && (
+                                                        <span>Duration: <strong>{internship.duration}</strong></span>
+                                                    )}
+                                                    {internship.stipend && (
+                                                        <span>Stipend: <strong>{internship.stipend}</strong></span>
+                                                    )}
+                                                    {internship.domain && (
+                                                        <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium">
+                                                            {internship.domain}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </motion.div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Portfolio Gaps */}
+                            {analysis.portfolio_gaps && analysis.portfolio_gaps.length > 0 && (
+                                <div className="bg-gradient-to-r from-red-50 via-white to-orange-50 border border-red-200 rounded-2xl p-6">
+                                    <h3 className="text-2xl font-bold text-red-800 mb-6 flex items-center">
+                                        <AlertCircle className="w-6 h-6 mr-3" />
+                                        Portfolio Gaps ({analysis.portfolio_gaps.length})
+                                    </h3>
+                                    <div className="space-y-4 max-h-96 overflow-y-auto">
+                                        {analysis.portfolio_gaps.map((gap, index) => (
+                                            <motion.div
+                                                key={index}
+                                                initial={{ opacity: 0, y: 20 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: index * 0.1 }}
+                                                className="bg-white border border-red-200 rounded-xl p-4 hover:shadow-lg transition-all"
+                                            >
+                                                <div className="flex items-start justify-between mb-3">
+                                                    <h4 className="text-red-700 font-bold text-lg">{gap.title || gap.gap_type}</h4>
+                                                    <span className={`text-xs px-3 py-1 rounded-full font-bold border ${gap.priority === 'high' ? 'bg-red-100 text-red-700 border-red-300' :
+                                                            gap.priority === 'medium' ? 'bg-orange-100 text-orange-700 border-orange-300' :
+                                                                'bg-blue-100 text-blue-700 border-blue-300'
+                                                        }`}>
+                                                        {gap.priority || 'medium'} priority
+                                                    </span>
+                                                </div>
+                                                {gap.description && (
+                                                    <p className="text-gray-700 mb-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                                        {gap.description}
+                                                    </p>
+                                                )}
+                                                {gap.suggested_action && (
+                                                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                                                        <p className="text-green-700 font-medium text-sm">💡 Suggested Action:</p>
+                                                        <p className="text-green-800 text-sm">{gap.suggested_action}</p>
+                                                    </div>
+                                                )}
+                                                <div className="flex items-center gap-2 mt-3 text-sm">
+                                                    {gap.estimated_time && (
+                                                        <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full text-xs">
+                                                            ⏱️ {gap.estimated_time}
+                                                        </span>
+                                                    )}
+                                                    {gap.resources && gap.resources.length > 0 && (
+                                                        <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs">
+                                                            📚 {gap.resources.length} resources
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </motion.div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Readiness Evaluations */}
+                            {analysis.readiness_evaluations && analysis.readiness_evaluations.length > 0 && (
+                                <div className="bg-gradient-to-r from-purple-50 via-white to-indigo-50 border border-purple-200 rounded-2xl p-6">
+                                    <h3 className="text-2xl font-bold text-purple-800 mb-6 flex items-center">
+                                        <BarChart3 className="w-6 h-6 mr-3" />
+                                        Readiness Evaluations
+                                    </h3>
+                                    <div className="space-y-4">
+                                        {analysis.readiness_evaluations.map((evaluation, index) => (
+                                            <motion.div
+                                                key={index}
+                                                initial={{ opacity: 0, x: -20 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                transition={{ delay: index * 0.1 }}
+                                                className="bg-white border border-purple-200 rounded-xl p-4 hover:shadow-lg transition-all"
+                                            >
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <div>
+                                                        <h4 className="font-bold text-lg text-purple-800">{evaluation.internship_title}</h4>
+                                                        {evaluation.company && (
+                                                            <p className="text-purple-600 font-medium">{evaluation.company}</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <div className="bg-gradient-to-r from-purple-100 to-indigo-100 border border-purple-300 px-4 py-2 rounded-xl">
+                                                            <span className="text-purple-800 font-bold text-xl">
+                                                                {(evaluation.readiness_score * 100).toFixed(0)}%
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-xs text-gray-600 mt-1 block">Readiness</span>
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Analysis Summary */}
+                            {analysis.analysis_summary && (
+                                <div className="bg-gradient-to-r from-indigo-50 via-white to-cyan-50 border border-indigo-200 rounded-2xl p-6">
+                                    <h3 className="text-2xl font-bold text-indigo-800 mb-4 flex items-center">
+                                        <Brain className="w-6 h-6 mr-3" />
+                                        AI Analysis Summary
+                                    </h3>
+                                    <p className="text-gray-700 text-lg leading-relaxed bg-white/80 p-4 rounded-xl border border-indigo-100 italic">
+                                        "{analysis.analysis_summary}"
+                                    </p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </motion.div>
             </motion.div>

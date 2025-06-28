@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../contexts/AuthContext';
-import { FileText, Brain, Target, BarChart3, Upload, Github, Clock, AlertCircle, Star, CheckCircle, User, Award, TrendingUp, RefreshCw, Eye, EyeOff, MessageSquare, Activity, Zap, ChevronDown, ChevronUp, Code, Database, Globe, Briefcase, Mail, Phone, MapPin, Calendar, ExternalLink, Copy, Download, Share2, Building, DollarSign, Timer, Sparkles, ArrowRight, BookmarkPlus, Filter, Search, Heart, Users, Laptop } from 'lucide-react';
+import { FileText, Brain, Target, BarChart3, Upload, Github, Clock, AlertCircle, Star, CheckCircle, User, Award, TrendingUp, RefreshCw, Eye, EyeOff, MessageSquare, Activity, Zap, ChevronDown, ChevronUp, Code, Database, Globe, Briefcase, Mail, Phone, MapPin, Calendar, ExternalLink, Copy, Download, Share2, Building, DollarSign, Timer, Sparkles, ArrowRight, BookmarkPlus, Filter, Search, Heart, Users, Laptop, Layers, Settings } from 'lucide-react';
 import { toast } from 'react-toastify';
 import axios from 'axios';
 
@@ -82,6 +82,8 @@ const Home = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [uploadedResume, setUploadedResume] = useState(null);
   const [selectedPreferences, setSelectedPreferences] = useState(['Web Development', 'Data Science']);
+  const [customDomain, setCustomDomain] = useState('');
+  const [showCustomInput, setShowCustomInput] = useState(false);
   const [githubLink, setGithubLink] = useState('');
   const [error, setError] = useState('');
   const [analysisStep, setAnalysisStep] = useState('');
@@ -255,11 +257,30 @@ const Home = () => {
   };
 
   const handlePreferenceToggle = (domain) => {
+    if (domain === 'Other') {
+      setShowCustomInput(!showCustomInput);
+      if (showCustomInput && customDomain.trim()) {
+        // Remove custom domain if closing input
+        setSelectedPreferences(prev => prev.filter(p => p !== customDomain.trim()));
+        setCustomDomain('');
+      }
+      return;
+    }
+
     setSelectedPreferences(prev =>
       prev.includes(domain)
         ? prev.filter(p => p !== domain)
         : [...prev, domain]
     );
+  };
+
+  const handleCustomDomainAdd = () => {
+    if (customDomain.trim() && !selectedPreferences.includes(customDomain.trim())) {
+      setSelectedPreferences(prev => [...prev, customDomain.trim()]);
+      setCustomDomain('');
+      setShowCustomInput(false);
+      toast.success('Custom domain added successfully!');
+    }
   };
 
   const handleFileUpload = async (event) => {
@@ -416,6 +437,8 @@ const Home = () => {
     setUploadedResume(null);
     setError('');
     setSelectedPreferences(['Web Development', 'Data Science']);
+    setCustomDomain('');
+    setShowCustomInput(false);
     setDashboardStats(null);
     toast.info('Dashboard reset to zero state', {
       icon: '🔄',
@@ -550,6 +573,10 @@ const Home = () => {
               isAnalyzing={isAnalyzing}
               uploadedResume={uploadedResume}
               selectedPreferences={selectedPreferences}
+              showCustomInput={showCustomInput}
+              customDomain={customDomain}
+              setCustomDomain={setCustomDomain}
+              handleCustomDomainAdd={handleCustomDomainAdd}
               githubLink={githubLink}
               setGithubLink={setGithubLink}
               error={error}
@@ -608,10 +635,18 @@ const WelcomeSection = ({ user, navigate, refreshDashboardToZero }) => (
           onClick={() => navigate('/analysis-history')}
           whileHover={{ scale: 1.05, y: -2 }}
           whileTap={{ scale: 0.95 }}
-          className="flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-blue-500/25"
+          className="flex items-center px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-indigo-500/25 group"
         >
-          <Clock className="w-4 h-4 mr-2" />
-          View History
+          <div className="flex items-center">
+            <div className="p-1 bg-white/20 rounded-lg mr-3 group-hover:bg-white/30 transition-all">
+              <Clock className="w-4 h-4" />
+            </div>
+            <div className="text-left">
+              <div className="font-semibold">View History</div>
+              <div className="text-xs text-indigo-100">All analysis reports</div>
+            </div>
+          </div>
+          <ArrowRight className="w-4 h-4 ml-3 group-hover:translate-x-1 transition-transform" />
         </motion.button>
         <motion.button
           onClick={refreshDashboardToZero}
@@ -665,6 +700,10 @@ const MainContent = ({
   isAnalyzing,
   uploadedResume,
   selectedPreferences,
+  showCustomInput,
+  customDomain,
+  setCustomDomain,
+  handleCustomDomainAdd,
   githubLink,
   setGithubLink,
   error,
@@ -697,6 +736,10 @@ const MainContent = ({
         <UploadSection
           isAnalyzing={isAnalyzing}
           selectedPreferences={selectedPreferences}
+          showCustomInput={showCustomInput}
+          customDomain={customDomain}
+          setCustomDomain={setCustomDomain}
+          handleCustomDomainAdd={handleCustomDomainAdd}
           githubLink={githubLink}
           setGithubLink={setGithubLink}
           error={error}
@@ -735,6 +778,10 @@ const MainContent = ({
 const UploadSection = ({
   isAnalyzing,
   selectedPreferences,
+  showCustomInput,
+  customDomain,
+  setCustomDomain,
+  handleCustomDomainAdd,
   githubLink,
   setGithubLink,
   error,
@@ -760,12 +807,15 @@ const UploadSection = ({
             Upload your resume and select preferred domains for personalized internship matching.
           </p>
         </div>
-        <div className="space-y-8">
-          <DomainPreferences
-            selectedPreferences={selectedPreferences}
-            availableDomains={availableDomains}
-            handlePreferenceToggle={handlePreferenceToggle}
-          />
+        <div className="space-y-8">              <DomainPreferences
+          selectedPreferences={selectedPreferences}
+          availableDomains={availableDomains}
+          handlePreferenceToggle={handlePreferenceToggle}
+          showCustomInput={showCustomInput}
+          customDomain={customDomain}
+          setCustomDomain={setCustomDomain}
+          handleCustomDomainAdd={handleCustomDomainAdd}
+        />
 
           <div className="space-y-2">
             <label htmlFor="github-input" className="block text-sm font-semibold text-blue-700">
@@ -837,7 +887,7 @@ const UploadSection = ({
   );
 };
 
-const DomainPreferences = ({ selectedPreferences, availableDomains, handlePreferenceToggle }) => (
+const DomainPreferences = ({ selectedPreferences, availableDomains, handlePreferenceToggle, showCustomInput, customDomain, setCustomDomain, handleCustomDomainAdd }) => (
   <div>
     <label className="block text-sm font-semibold text-blue-700 mb-4">
       Select Your Domain Preferences ({selectedPreferences.length} selected)
@@ -857,7 +907,60 @@ const DomainPreferences = ({ selectedPreferences, availableDomains, handlePrefer
           {domain}
         </motion.button>
       ))}
+
+      {/* Other Option */}
+      <motion.button
+        onClick={() => handlePreferenceToggle('Other')}
+        whileHover={{ scale: 1.02, y: -1 }}
+        whileTap={{ scale: 0.98 }}
+        className={`p-3 text-sm rounded-xl transition-all font-medium border-2 flex items-center justify-center ${showCustomInput
+          ? 'bg-orange-600 text-white border-orange-600 shadow-lg shadow-orange-200'
+          : 'bg-white/80 text-orange-700 border-orange-200 hover:bg-white hover:border-orange-300 hover:text-orange-600'
+          }`}
+      >
+        <span className="mr-2">✨</span>
+        Other
+      </motion.button>
     </div>
+
+    {/* Custom Domain Input */}
+    <AnimatePresence>
+      {showCustomInput && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          className="mt-4 p-4 bg-orange-50 rounded-xl border border-orange-200"
+        >
+          <label className="block text-sm font-semibold text-orange-700 mb-3">
+            Enter your custom domain:
+          </label>
+          <div className="flex gap-3">
+            <input
+              type="text"
+              value={customDomain}
+              onChange={(e) => setCustomDomain(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleCustomDomainAdd()}
+              placeholder="e.g., Robotics, E-commerce, HealthTech..."
+              className="flex-1 px-4 py-3 bg-white border border-orange-300 rounded-xl text-orange-800 placeholder-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+            />
+            <motion.button
+              onClick={handleCustomDomainAdd}
+              disabled={!customDomain.trim()}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-6 py-3 bg-orange-600 text-white rounded-xl hover:bg-orange-700 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Add
+            </motion.button>
+          </div>
+          <p className="text-xs text-orange-600 mt-2">
+            Add a specific domain that's not listed above
+          </p>
+        </motion.div>
+      )}
+    </AnimatePresence>
+
     <p className="text-xs text-blue-600 mt-3">
       Select multiple domains to get diverse internship recommendations
     </p>
@@ -1415,12 +1518,12 @@ const ProfileSummary = ({ analysisResults }) => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.1 }}
-      className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-lg p-6"
+      className="bg-white/95 backdrop-blur-sm border border-blue-200 rounded-2xl p-6 shadow-lg"
     >
-      <h3 className="text-xl font-bold mb-4 flex items-center">
-        <User className="w-5 h-5 mr-2 text-blue-400" />
+      <h3 className="text-xl font-bold mb-4 flex items-center text-blue-800">
+        <User className="w-5 h-5 mr-2 text-blue-600" />
         AI-Enhanced Profile Summary
-        <span className="ml-2 px-2 py-1 bg-blue-600/20 text-blue-300 text-xs rounded">
+        <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-lg border border-blue-300">
           {Math.round(((profile.skills?.length || 0) / 25) * 100)}% Complete
         </span>
       </h3>
@@ -1443,60 +1546,182 @@ const ProfileSummary = ({ analysisResults }) => {
 
 const PersonalInformation = ({ profile }) => (
   <motion.div
-    whileHover={{ scale: 1.01 }}
-    className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/50"
+    whileHover={{ scale: 1.02, y: -2 }}
+    className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 border border-blue-200 hover:border-blue-300 transition-all duration-300 shadow-md hover:shadow-lg"
   >
-    <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center">
-      <User className="w-4 h-4 mr-2" />
-      Personal Information
-    </h4>
-    <div className="space-y-2">
-      <div>
-        <span className="text-xs text-gray-500">Name:</span>
-        <p className="font-semibold text-lg">{profile.name || 'Not detected'}</p>
+    <div className="flex items-center mb-6">
+      <div className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl mr-4 shadow-md">
+        <User className="w-6 h-6 text-white" />
       </div>
       <div>
-        <span className="text-xs text-gray-500">Experience Level:</span>
-        <p className="font-semibold capitalize text-green-400">
-          {profile.experience_level || 'Entry-level'}
-          {profile.years_of_experience &&
-            ` (${profile.years_of_experience})`}
+        <h4 className="text-lg font-semibold text-blue-800">Personal Information</h4>
+        <p className="text-blue-600 text-sm">Professional profile details</p>
+      </div>
+    </div>
+
+    <div className="space-y-6">
+      <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-blue-700 text-sm font-medium">Full Name</span>
+          <User className="w-4 h-4 text-blue-600" />
+        </div>
+        <p className="font-bold text-xl text-blue-900">
+          {profile.name || 'Not detected'}
         </p>
+        {!profile.name && (
+          <p className="text-blue-600 text-xs mt-1">Add your name to improve profile visibility</p>
+        )}
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-green-50 rounded-xl p-4 border border-green-200">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-green-700 text-sm font-medium">Experience Level</span>
+            <Award className="w-4 h-4 text-green-600" />
+          </div>
+          <p className="font-bold text-lg text-green-900 capitalize">
+            {profile.experience_level || 'Entry-level'}
+          </p>
+          {profile.years_of_experience && (
+            <p className="text-green-700 text-sm mt-1">
+              {profile.years_of_experience} years
+            </p>
+          )}
+        </div>
+
+        <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-purple-700 text-sm font-medium">Profile Status</span>
+            <CheckCircle className="w-4 h-4 text-purple-600" />
+          </div>
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-green-500 rounded-full mr-2 animate-pulse" />
+            <p className="font-medium text-purple-900">Active</p>
+          </div>
+          <p className="text-purple-700 text-xs mt-1">
+            Profile successfully analyzed
+          </p>
+        </div>
+      </div>
+
+      {profile.location && (
+        <div className="bg-orange-50 rounded-xl p-4 border border-orange-200">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-orange-700 text-sm font-medium">Location</span>
+            <MapPin className="w-4 h-4 text-orange-600" />
+          </div>
+          <p className="font-medium text-orange-900">{profile.location}</p>
+        </div>
+      )}
     </div>
   </motion.div>
 );
 
 const ContactInformation = ({ profile }) => (
   <motion.div
-    whileHover={{ scale: 1.01 }}
-    className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/50"
+    whileHover={{ scale: 1.02, y: -2 }}
+    className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 border border-blue-200 hover:border-blue-300 transition-all duration-300 shadow-md hover:shadow-lg"
   >
-    <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center">
-      <Mail className="w-4 h-4 mr-2" />
-      Contact Information
-    </h4>
-    <div className="space-y-2 text-sm">
-      {profile.email && (
-        <div className="text-blue-300 flex items-center">
-          <Mail className="w-3 h-3 mr-1" />
-          {profile.email}
+    <div className="flex items-center mb-6">
+      <div className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl mr-4 shadow-md">
+        <Mail className="w-6 h-6 text-white" />
+      </div>
+      <div>
+        <h4 className="text-lg font-semibold text-blue-800">Contact Information</h4>
+        <p className="text-blue-600 text-sm">Professional contact details</p>
+      </div>
+    </div>
+
+    <div className="space-y-4">
+      {profile.email ? (
+        <motion.div
+          whileHover={{ x: 5 }}
+          className="flex items-center justify-between p-4 bg-blue-50 hover:bg-blue-100 rounded-xl border border-blue-200 transition-all group"
+        >
+          <div className="flex items-center">
+            <div className="p-2 bg-blue-600 rounded-lg mr-3 shadow-md">
+              <Mail className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <p className="text-blue-700 font-medium">Email Address</p>
+              <p className="text-blue-900 font-mono text-sm">{profile.email}</p>
+            </div>
+          </div>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => {
+              navigator.clipboard.writeText(profile.email);
+              toast.success('Email copied to clipboard!');
+            }}
+            className="p-2 bg-blue-100 hover:bg-blue-200 rounded-lg transition-all"
+          >
+            <Copy className="w-4 h-4 text-blue-600" />
+          </motion.button>
+        </motion.div>
+      ) : (
+        <div className="p-4 bg-red-50 rounded-xl border border-red-200 text-center">
+          <Mail className="w-8 h-8 text-red-500 mx-auto mb-2 opacity-70" />
+          <p className="text-red-700 text-sm font-medium">No email detected</p>
+          <p className="text-red-600 text-xs mt-1">Add email to improve contact visibility</p>
         </div>
       )}
-      {profile.phone && (
-        <div className="text-green-300 flex items-center">
-          <Phone className="w-3 h-3 mr-1" />
-          {profile.phone}
+
+      {profile.phone ? (
+        <motion.div
+          whileHover={{ x: 5 }}
+          className="flex items-center justify-between p-4 bg-green-50 hover:bg-green-100 rounded-xl border border-green-200 transition-all group"
+        >
+          <div className="flex items-center">
+            <div className="p-2 bg-green-600 rounded-lg mr-3 shadow-md">
+              <Phone className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <p className="text-green-700 font-medium">Phone Number</p>
+              <p className="text-green-900 font-mono text-sm">{profile.phone}</p>
+            </div>
+          </div>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => {
+              navigator.clipboard.writeText(profile.phone);
+              toast.success('Phone number copied to clipboard!');
+            }}
+            className="p-2 bg-green-100 hover:bg-green-200 rounded-lg transition-all"
+          >
+            <Copy className="w-4 h-4 text-green-600" />
+          </motion.button>
+        </motion.div>
+      ) : (
+        <div className="p-4 bg-red-50 rounded-xl border border-red-200 text-center">
+          <Phone className="w-8 h-8 text-red-500 mx-auto mb-2 opacity-70" />
+          <p className="text-red-700 text-sm font-medium">No phone number detected</p>
+          <p className="text-red-600 text-xs mt-1">Add phone number for better accessibility</p>
         </div>
       )}
+
       {profile.education?.[0]?.institution && (
-        <div className="text-purple-300 flex items-center">
-          <Award className="w-3 h-3 mr-1" />
-          {profile.education[0].institution}
-        </div>
+        <motion.div
+          whileHover={{ x: 5 }}
+          className="flex items-center p-4 bg-purple-50 hover:bg-purple-100 rounded-xl border border-purple-200 transition-all"
+        >
+          <div className="p-2 bg-purple-600 rounded-lg mr-3 shadow-md">
+            <Award className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <p className="text-purple-700 font-medium">Primary Institution</p>
+            <p className="text-purple-900 text-sm">{profile.education[0].institution}</p>
+          </div>
+        </motion.div>
       )}
-      {!profile.email && !profile.phone && (
-        <div className="text-gray-400">No contact information detected</div>
+
+      {!profile.email && !profile.phone && !profile.education?.[0]?.institution && (
+        <div className="text-center py-8">
+          <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3 opacity-50" />
+          <p className="text-gray-600 text-sm font-medium">No contact information detected</p>
+          <p className="text-gray-500 text-xs mt-1">Add contact details to improve networking opportunities</p>
+        </div>
       )}
     </div>
   </motion.div>
@@ -1508,33 +1733,75 @@ const hasOnlineProfiles = (profile) => {
 
 const OnlineProfiles = ({ profile }) => (
   <motion.div
-    whileHover={{ scale: 1.01 }}
-    className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/50"
+    whileHover={{ scale: 1.02, y: -2 }}
+    className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 border border-blue-200 hover:border-blue-300 transition-all duration-300 shadow-md hover:shadow-lg"
   >
-    <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center">
-      <Globe className="w-4 h-4 mr-2" />
+    <h4 className="text-lg font-semibold text-blue-800 mb-4 flex items-center">
+      <Globe className="w-5 h-5 mr-3 text-blue-600" />
       Online Presence
+      <motion.div
+        animate={{ scale: [1, 1.2, 1] }}
+        transition={{ duration: 2, repeat: Infinity }}
+        className="ml-2 w-2 h-2 bg-green-500 rounded-full"
+      />
     </h4>
-    <div className="space-y-2 text-sm">
+    <div className="space-y-4">
       {profile.linkedin && (
-        <div className="flex items-center text-blue-300">
-          <Briefcase className="w-4 h-4 mr-2" />
-          LinkedIn Profile
-          <ExternalLink className="w-3 h-3 ml-1" />
-        </div>
+        <motion.div
+          whileHover={{ x: 5 }}
+          className="flex items-center justify-between p-3 bg-blue-50 hover:bg-blue-100 rounded-xl border border-blue-200 transition-all group"
+        >
+          <div className="flex items-center">
+            <div className="p-2 bg-blue-600 rounded-lg mr-3 shadow-md">
+              <Briefcase className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <p className="text-blue-700 font-medium">LinkedIn Profile</p>
+              <p className="text-blue-600 text-sm">Professional networking</p>
+            </div>
+          </div>
+          <ExternalLink className="w-4 h-4 text-blue-500 group-hover:text-blue-600 transition-colors" />
+        </motion.div>
       )}
       {profile.github && (
-        <div className="flex items-center text-purple-300">
-          <Github className="w-4 h-4 mr-2" />
-          GitHub Profile
-          <ExternalLink className="w-3 h-3 ml-1" />
-        </div>
+        <motion.div
+          whileHover={{ x: 5 }}
+          className="flex items-center justify-between p-3 bg-purple-50 hover:bg-purple-100 rounded-xl border border-purple-200 transition-all group"
+        >
+          <div className="flex items-center">
+            <div className="p-2 bg-purple-600 rounded-lg mr-3 shadow-md">
+              <Github className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <p className="text-purple-700 font-medium">GitHub Profile</p>
+              <p className="text-purple-600 text-sm">Code repositories</p>
+            </div>
+          </div>
+          <ExternalLink className="w-4 h-4 text-purple-500 group-hover:text-purple-600 transition-colors" />
+        </motion.div>
       )}
       {profile.website && (
-        <div className="flex items-center text-green-300">
-          <Globe className="w-4 h-4 mr-2" />
-          Personal Website
-          <ExternalLink className="w-3 h-3 ml-1" />
+        <motion.div
+          whileHover={{ x: 5 }}
+          className="flex items-center justify-between p-3 bg-green-50 hover:bg-green-100 rounded-xl border border-green-200 transition-all group"
+        >
+          <div className="flex items-center">
+            <div className="p-2 bg-green-600 rounded-lg mr-3 shadow-md">
+              <Globe className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <p className="text-green-700 font-medium">Personal Website</p>
+              <p className="text-green-600 text-sm">Portfolio showcase</p>
+            </div>
+          </div>
+          <ExternalLink className="w-4 h-4 text-green-500 group-hover:text-green-600 transition-colors" />
+        </motion.div>
+      )}
+      {!profile.linkedin && !profile.github && !profile.website && (
+        <div className="text-center py-8">
+          <Globe className="w-12 h-12 text-gray-400 mx-auto mb-3 opacity-50" />
+          <p className="text-gray-600 text-sm font-medium">No online profiles detected</p>
+          <p className="text-gray-500 text-xs mt-1">Add LinkedIn or GitHub links to enhance your profile</p>
         </div>
       )}
     </div>
@@ -1543,33 +1810,44 @@ const OnlineProfiles = ({ profile }) => (
 
 const TechnicalSkills = ({ profile }) => (
   <motion.div
-    whileHover={{ scale: 1.01 }}
-    className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/50"
+    whileHover={{ scale: 1.02, y: -2 }}
+    className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 border border-blue-200 hover:border-blue-300 transition-all duration-300 shadow-md hover:shadow-lg"
   >
-    <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center">
-      <Code className="w-4 h-4 mr-2" />
-      Technical Skills ({profile.skills?.length || 0} detected)
-    </h4>
-    <div className="space-y-3">
+    <div className="flex items-center justify-between mb-6">
+      <h4 className="text-lg font-semibold text-blue-800 flex items-center">
+        <Code className="w-5 h-5 mr-3 text-blue-600" />
+        Technical Skills
+      </h4>
+      <div className="flex items-center">
+        <span className="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded-full border border-blue-300">
+          {profile.skills?.length || 0} skills
+        </span>
+      </div>
+    </div>
+
+    <div className="space-y-6">
       {profile.programming_languages?.length > 0 && (
         <SkillCategory
           title="Programming Languages"
           items={profile.programming_languages}
           color="blue"
+          icon={<Code className="w-4 h-4" />}
         />
       )}
       {profile.frameworks?.length > 0 && (
         <SkillCategory
-          title="Frameworks"
+          title="Frameworks & Libraries"
           items={profile.frameworks}
           color="green"
+          icon={<Layers className="w-4 h-4" />}
         />
       )}
       {profile.tools?.length > 0 && (
         <SkillCategory
-          title="Tools"
+          title="Development Tools"
           items={profile.tools}
           color="purple"
+          icon={<Settings className="w-4 h-4" />}
         />
       )}
       {profile.databases?.length > 0 && (
@@ -1577,23 +1855,29 @@ const TechnicalSkills = ({ profile }) => (
           title="Databases"
           items={profile.databases}
           color="orange"
+          icon={<Database className="w-4 h-4" />}
         />
       )}
+
       {(!profile.programming_languages?.length &&
         !profile.frameworks?.length &&
         !profile.tools?.length &&
         !profile.databases?.length) &&
         profile.skills?.length > 0 && (
-          <div>
-            <span className="text-xs text-gray-500 mb-1 block">All Skills:</span>
-            <div className="flex flex-wrap gap-1">
+          <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+            <div className="flex items-center mb-3">
+              <Sparkles className="w-4 h-4 text-blue-600 mr-2" />
+              <span className="text-sm font-medium text-blue-800">All Detected Skills</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
               {profile.skills.map((skill, idx) => (
                 <motion.span
                   key={idx}
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: idx * 0.05 }}
-                  className="px-2 py-1 bg-gray-600/20 text-gray-300 text-xs rounded hover:bg-gray-600/30 transition-colors"
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  className="px-3 py-2 bg-white text-blue-700 text-sm rounded-lg hover:bg-blue-100 transition-all border border-blue-300 cursor-pointer font-medium shadow-sm"
                 >
                   {skill}
                 </motion.span>
@@ -1601,32 +1885,74 @@ const TechnicalSkills = ({ profile }) => (
             </div>
           </div>
         )}
+
+      {(!profile.skills?.length || profile.skills.length === 0) && (
+        <div className="text-center py-8">
+          <Code className="w-12 h-12 text-gray-400 mx-auto mb-3 opacity-50" />
+          <p className="text-gray-600 text-sm font-medium">No technical skills detected</p>
+          <p className="text-gray-500 text-xs mt-1">Add relevant skills to your resume</p>
+        </div>
+      )}
     </div>
   </motion.div>
 );
 
-const SkillCategory = ({ title, items, color }) => {
+const SkillCategory = ({ title, items, color, icon }) => {
   const colorClasses = {
-    blue: 'bg-blue-600/20 text-blue-300 hover:bg-blue-600/30',
-    green: 'bg-green-600/20 text-green-300 hover:bg-green-600/30',
-    purple: 'bg-purple-600/20 text-purple-300 hover:bg-purple-600/30',
-    orange: 'bg-orange-600/20 text-orange-300 hover:bg-orange-600/30'
+    blue: {
+      bg: 'bg-blue-50 hover:bg-blue-100',
+      text: 'text-blue-700',
+      border: 'border-blue-200',
+      buttonBg: 'bg-blue-100',
+      skillBg: 'bg-white hover:bg-blue-50'
+    },
+    green: {
+      bg: 'bg-green-50 hover:bg-green-100',
+      text: 'text-green-700',
+      border: 'border-green-200',
+      buttonBg: 'bg-green-100',
+      skillBg: 'bg-white hover:bg-green-50'
+    },
+    purple: {
+      bg: 'bg-purple-50 hover:bg-purple-100',
+      text: 'text-purple-700',
+      border: 'border-purple-200',
+      buttonBg: 'bg-purple-100',
+      skillBg: 'bg-white hover:bg-purple-50'
+    },
+    orange: {
+      bg: 'bg-orange-50 hover:bg-orange-100',
+      text: 'text-orange-700',
+      border: 'border-orange-200',
+      buttonBg: 'bg-orange-100',
+      skillBg: 'bg-white hover:bg-orange-50'
+    }
   };
+
+  const colorClass = colorClasses[color];
+
   return (
-    <div>
-      <span className="text-xs text-gray-500 flex items-center mb-1">
-        {color === 'blue' && <Code className="w-3 h-3 mr-1" />}
-        {title}:
-      </span>
-      <div className="flex flex-wrap gap-1">
+    <div className={`${colorClass.bg} rounded-xl p-4 border ${colorClass.border} transition-all`}>
+      <div className="flex items-center mb-3">
+        <div className={`p-1 ${colorClass.buttonBg} rounded-lg mr-2`}>
+          {icon}
+        </div>
+        <span className={`text-sm font-medium ${colorClass.text}`}>
+          {title}
+        </span>
+        <span className="ml-2 px-2 py-1 bg-gray-200 text-gray-600 text-xs rounded-full font-medium">
+          {items.length}
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-2">
         {items.map((item, idx) => (
           <motion.span
             key={idx}
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: idx * 0.1 }}
-            whileHover={{ scale: 1.05 }}
-            className={`px-2 py-1 ${colorClasses[color]} text-xs rounded cursor-pointer hover:${colorClasses[color]} transition-colors`}
+            whileHover={{ scale: 1.05, y: -2 }}
+            className={`px-3 py-2 ${colorClass.skillBg} ${colorClass.text} text-sm rounded-lg cursor-pointer transition-all border ${colorClass.border} font-medium shadow-sm`}
           >
             {item}
           </motion.span>
@@ -1638,49 +1964,142 @@ const SkillCategory = ({ title, items, color }) => {
 
 const Education = ({ profile }) => (
   <motion.div
-    whileHover={{ scale: 1.01 }}
-    className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/50"
+    whileHover={{ scale: 1.02, y: -2 }}
+    className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 border border-blue-200 hover:border-blue-300 transition-all duration-300 shadow-md hover:shadow-lg"
   >
-    <h4 className="text-sm font-medium text-gray-400 mb-3 flex items-center">
-      <Award className="w-4 h-4 mr-2" />
-      Education
-    </h4>
-    <div className="space-y-3">
-      {profile.education.map((edu, idx) => (
-        <motion.div
-          key={idx}
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: idx * 0.1 }}
-          className="bg-gray-900/30 rounded p-3 border border-gray-700/30"
-        >
-          <div className="font-semibold text-sm">{edu.degree}</div>
-          <div className="text-sm text-gray-300">{edu.institution}</div>
-          <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
-            {edu.year && (
-              <span className="flex items-center">
-                <Calendar className="w-3 h-3 mr-1" />
-                {edu.year}
-              </span>
+    <div className="flex items-center justify-between mb-6">
+      <h4 className="text-lg font-semibold text-blue-800 flex items-center">
+        <Award className="w-5 h-5 mr-3 text-blue-600" />
+        Education
+      </h4>
+      <div className="flex items-center">
+        <span className="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded-full border border-blue-300">
+          {profile.education?.length || 0} institutions
+        </span>
+      </div>
+    </div>
+
+    <div className="space-y-4">
+      {profile.education && profile.education.length > 0 ? (
+        profile.education.map((edu, idx) => (
+          <motion.div
+            key={idx}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: idx * 0.1 }}
+            whileHover={{ scale: 1.02, x: 5 }}
+            className="bg-blue-50 rounded-xl p-5 border border-blue-200 hover:border-blue-300 transition-all group hover:shadow-md"
+          >
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1">
+                <h5 className="font-bold text-blue-900 text-lg group-hover:text-blue-700 transition-colors">
+                  {edu.degree || 'Degree'}
+                </h5>
+                <p className="text-blue-700 font-medium">{edu.institution || 'Institution'}</p>
+              </div>
+              <div className="text-right">
+                {edu.gpa && (
+                  <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-bold border border-green-300">
+                    GPA: {edu.gpa}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-6 text-sm">
+              {edu.year && (
+                <div className="flex items-center text-blue-600">
+                  <Calendar className="w-4 h-4 mr-2 text-blue-500" />
+                  <span className="font-medium">{edu.year}</span>
+                </div>
+              )}
+              {edu.location && (
+                <div className="flex items-center text-blue-600">
+                  <MapPin className="w-4 h-4 mr-2 text-blue-500" />
+                  <span>{edu.location}</span>
+                </div>
+              )}
+            </div>
+
+            {edu.description && (
+              <div className="mt-3 p-3 bg-white rounded-lg border border-blue-300">
+                <p className="text-blue-800 text-sm italic">{edu.description}</p>
+              </div>
             )}
-            {edu.gpa && (
-              <span className="text-green-400 font-medium">GPA: {edu.gpa}</span>
+
+            {edu.achievements && edu.achievements.length > 0 && (
+              <div className="mt-3">
+                <p className="text-xs text-blue-600 mb-2 font-medium">Achievements:</p>
+                <div className="flex flex-wrap gap-2">
+                  {edu.achievements.map((achievement, achieveIdx) => (
+                    <span key={achieveIdx} className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full border border-yellow-300">
+                      {achievement}
+                    </span>
+                  ))}
+                </div>
+              </div>
             )}
-          </div>
-        </motion.div>
-      ))}
+          </motion.div>
+        ))
+      ) : (
+        <div className="text-center py-8">
+          <Award className="w-12 h-12 text-gray-400 mx-auto mb-3 opacity-50" />
+          <p className="text-gray-600 text-sm font-medium">No education information detected</p>
+          <p className="text-gray-500 text-xs mt-1">Add your educational background to enhance your profile</p>
+        </div>
+      )}
     </div>
   </motion.div>
 );
 
 const ProfessionalSummary = ({ profile }) => (
   <motion.div
-    whileHover={{ scale: 1.01 }}
-    className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/50"
+    whileHover={{ scale: 1.02, y: -2 }}
+    className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 border border-blue-200 hover:border-blue-300 transition-all duration-300 shadow-md hover:shadow-lg"
   >
-    <h4 className="text-sm font-medium text-gray-400 mb-3">Professional Summary</h4>
-    <div className="text-sm text-gray-300 leading-relaxed italic">
-      "{profile.summary}"
+    <div className="flex items-center mb-6">
+      <div className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl mr-4 shadow-md">
+        <Sparkles className="w-6 h-6 text-white" />
+      </div>
+      <div>
+        <h4 className="text-lg font-semibold text-blue-800">Professional Summary</h4>
+        <p className="text-blue-600 text-sm">AI-generated professional overview</p>
+      </div>
+    </div>
+
+    <div className="relative">
+      <div className="absolute top-0 left-0 text-6xl text-blue-300/30 font-serif">"</div>
+      <div className="pl-8 pr-4">
+        <p className="text-blue-900 text-lg leading-relaxed italic font-medium">
+          {profile.summary}
+        </p>
+      </div>
+      <div className="absolute bottom-0 right-0 text-6xl text-blue-300/30 font-serif rotate-180">"</div>
+    </div>
+
+    <div className="mt-6 flex items-center justify-between pt-4 border-t border-blue-200">
+      <div className="flex items-center text-sm text-blue-600">
+        <Brain className="w-4 h-4 mr-2" />
+        Generated by AI Analysis
+      </div>
+      <div className="flex items-center gap-2">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          className="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-sm transition-all border border-blue-300"
+        >
+          <Copy className="w-3 h-3 mr-1 inline" />
+          Copy
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          className="px-3 py-1 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg text-sm transition-all border border-purple-300"
+        >
+          <RefreshCw className="w-3 h-3 mr-1 inline" />
+          Regenerate
+        </motion.button>
+      </div>
     </div>
   </motion.div>
 );
