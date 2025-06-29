@@ -1968,3 +1968,45 @@ def get_platform_statistics(request):
             'success': False,
             'error': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def test_scraping(request):
+    """Test endpoint to scrape a few internships and check Gemini integration"""
+    try:
+        # Import scraper here to avoid circular imports
+        from api.scrap import InternshipScraper
+        
+        scraper = InternshipScraper()
+        
+        # Scrape just a few internships for testing
+        logger.info("Starting test scraping...")
+        internships = asyncio.run(scraper.scrape_indeed("internship", "India", max_pages=1))
+        
+        if internships:
+            # Save the internships
+            saved_count = scraper.save_internships(internships)
+            
+            return Response({
+                'success': True,
+                'message': f'Test scraping completed successfully',
+                'scraped_count': len(internships),
+                'saved_count': saved_count,
+                'sample_internships': internships[:3] if internships else [],
+                'gemini_available': hasattr(scraper, 'GEMINI_AVAILABLE') and scraper.GEMINI_AVAILABLE
+            })
+        else:
+            return Response({
+                'success': False,
+                'message': 'No internships were scraped',
+                'scraped_count': 0,
+                'saved_count': 0
+            })
+            
+    except Exception as e:
+        logger.error(f"Error in test_scraping: {str(e)}")
+        return Response({
+            'success': False,
+            'error': str(e),
+            'message': 'Test scraping failed'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

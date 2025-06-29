@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import InternshipsSection from '../components/InternshipsSection';
 import { useAuth } from '../contexts/AuthContext';
 import { FileText, Brain, Target, BarChart3, Upload, Github, Clock, AlertCircle, Star, CheckCircle, User, Award, TrendingUp, RefreshCw, Eye, EyeOff, MessageSquare, Activity, Zap, ChevronDown, ChevronUp, Code, Database, Globe, Briefcase, Mail, Phone, MapPin, Calendar, ExternalLink, Copy, Download, Share2, Building, DollarSign, Timer, Sparkles, ArrowRight, BookmarkPlus, Filter, Search, Heart, Users, Laptop, Layers, Settings, FolderOpen, GitBranch } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -611,6 +612,8 @@ const Home = () => {
               setAnalysisResults={setAnalysisResults}
             />
           </div>
+          {/* Internships Section */}
+          <InternshipsSection internships={internships} loading={loading} />
           {/* Features Section */}
           <FeaturesSection />
         </motion.div>
@@ -1423,27 +1426,24 @@ const DocumentStatistics = ({ extraction }) => (
     >
       <p className="text-blue-800 font-semibold text-sm mb-3">Contact Detection</p>
       <div className="text-sm space-y-2">
-        <div className={`flex items-center justify-between p-2 rounded-lg ${
-          extraction.email_patterns_found > 0 
-            ? 'bg-green-50 text-green-700 border border-green-200' 
-            : 'bg-red-50 text-red-700 border border-red-200'
-        }`}>
+        <div className={`flex items-center justify-between p-2 rounded-lg ${extraction.email_patterns_found > 0
+          ? 'bg-green-50 text-green-700 border border-green-200'
+          : 'bg-red-50 text-red-700 border border-red-200'
+          }`}>
           <span className="flex items-center">📧 Email</span>
           <span className="font-bold">{extraction.email_patterns_found || '0'}</span>
         </div>
-        <div className={`flex items-center justify-between p-2 rounded-lg ${
-          extraction.phone_patterns_found > 0 
-            ? 'bg-green-50 text-green-700 border border-green-200' 
-            : 'bg-red-50 text-red-700 border border-red-200'
-        }`}>
+        <div className={`flex items-center justify-between p-2 rounded-lg ${extraction.phone_patterns_found > 0
+          ? 'bg-green-50 text-green-700 border border-green-200'
+          : 'bg-red-50 text-red-700 border border-red-200'
+          }`}>
           <span className="flex items-center">📱 Phone</span>
           <span className="font-bold">{extraction.phone_patterns_found || '0'}</span>
         </div>
-        <div className={`flex items-center justify-between p-2 rounded-lg ${
-          extraction.url_patterns_found > 0 
-            ? 'bg-green-50 text-green-700 border border-green-200' 
-            : 'bg-red-50 text-red-700 border border-red-200'
-        }`}>
+        <div className={`flex items-center justify-between p-2 rounded-lg ${extraction.url_patterns_found > 0
+          ? 'bg-green-50 text-green-700 border border-green-200'
+          : 'bg-red-50 text-red-700 border border-red-200'
+          }`}>
           <span className="flex items-center">🔗 URLs</span>
           <span className="font-bold">{extraction.url_patterns_found || '0'}</span>
         </div>
@@ -1509,9 +1509,8 @@ const ExtractedTextDisplay = ({ analysisResults, showFullText, setShowFullText }
         Processed by Gemini AI
       </span>
     </div>
-    <div className={`p-6 bg-gray-50 text-sm text-gray-800 whitespace-pre-wrap font-mono leading-relaxed border-l-4 border-blue-400 ${
-      showFullText ? 'max-h-none' : 'max-h-80'
-    } overflow-y-auto transition-all duration-300`}>
+    <div className={`p-6 bg-gray-50 text-sm text-gray-800 whitespace-pre-wrap font-mono leading-relaxed border-l-4 border-blue-400 ${showFullText ? 'max-h-none' : 'max-h-80'
+      } overflow-y-auto transition-all duration-300`}>
       {analysisResults.file_info?.resume_text ? (
         <motion.div
           initial={{ opacity: 0 }}
@@ -1550,7 +1549,7 @@ const ProfileSummary = ({ analysisResults }) => {
   const profile = analysisResults.student_profile || {};
   const extraction = analysisResults.detailed_extraction || {};
   const completionPercentage = Math.round(((profile.skills?.length || 0) / 25) * 100);
-  
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -1580,7 +1579,7 @@ const ProfileSummary = ({ analysisResults }) => {
           </span>
         </div>
       </div>
-      
+
       <div className="grid md:grid-cols-2 gap-8">
         <div className="space-y-6">
           <PersonalInformation profile={profile} />
@@ -1669,7 +1668,7 @@ const PersonalInformation = ({ profile }) => (
       )}
     </div>
   </motion.div>
-);  
+);
 
 const ContactInformation = ({ profile }) => (
   <motion.div
@@ -2168,7 +2167,7 @@ const InternshipRecommendations = ({ analysisResults }) => {
   );
   const uniqueDomains = new Set(recommendations.map(rec => rec.domain)).size;
   const highMatchCount = recommendations.filter(rec => rec.matching_score >= 0.8).length;
-  
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -2184,24 +2183,9 @@ const InternshipRecommendations = ({ analysisResults }) => {
             {recommendations.length} Found
           </span>
         </h3>
-        <div className="flex gap-3">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm flex items-center gap-2 transition-all font-medium shadow-md hover:shadow-lg"
-          >
-            <Eye className="w-4 h-4" />
-            View All
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            className="px-5 py-2 bg-white hover:bg-blue-50 text-blue-600 border-2 border-blue-200 hover:border-blue-300 rounded-lg text-sm flex items-center gap-2 transition-all font-medium"
-          >
-            <Download className="w-4 h-4" />
-            Export
-          </motion.button>
-        </div>
+
       </div>
-      
+
       <div className="relative mb-8 overflow-hidden">
         <motion.div
           className="flex gap-6 pb-4"
@@ -2231,7 +2215,7 @@ const InternshipRecommendations = ({ analysisResults }) => {
         </motion.div>
         <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-white to-transparent pointer-events-none" />
       </div>
-      
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8 pt-8 border-t border-blue-100">
         <StatCard value={recommendations.length} label="Total Matches" color="blue" />
         <StatCard value={`${averageMatch}%`} label="Avg Match" color="green" />
@@ -2246,14 +2230,14 @@ const InternshipCard = ({ rec, index }) => {
   const [isLiked, setIsLiked] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
-  
+
   const matchColor = rec.matching_score >= 0.8 ? 'bg-green-100 text-green-800 border-green-200' :
     rec.matching_score >= 0.6 ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
       'bg-red-100 text-red-800 border-red-200';
   const matchText = rec.matching_score >= 0.8 ? 'Excellent Match' :
     rec.matching_score >= 0.6 ? 'Good Match' :
       'Partial Match';
-  
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
@@ -2272,7 +2256,7 @@ const InternshipCard = ({ rec, index }) => {
       className="group relative bg-white rounded-2xl overflow-hidden border-2 border-blue-100 hover:border-blue-300 transition-all duration-300 shadow-lg hover:shadow-xl h-fit"
     >
       <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-blue-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-      
+
       <div className="relative p-6 pb-4">
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1 min-w-0">
@@ -2324,7 +2308,7 @@ const InternshipCard = ({ rec, index }) => {
           </div>
         </div>
       </div>
-      
+
       <div className="p-6 pt-0">
         <div className="space-y-3 mb-4">
           <div className="flex items-center justify-between text-sm bg-gray-50 p-3 rounded-lg">
@@ -2340,7 +2324,7 @@ const InternshipCard = ({ rec, index }) => {
             <span className="text-gray-800 font-semibold">{rec.stipend || 'Unpaid'}</span>
           </div>
         </div>
-        
+
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
@@ -2351,7 +2335,7 @@ const InternshipCard = ({ rec, index }) => {
           <ChevronDown className={`w-4 h-4 transition-transform ${showFullDescription ? 'rotate-180' : ''}`} />
         </motion.button>
       </div>
-      
+
       {showFullDescription && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
@@ -2363,36 +2347,51 @@ const InternshipCard = ({ rec, index }) => {
           <p className="text-sm text-gray-700 leading-relaxed mb-4 bg-white p-4 rounded-lg border border-blue-100">
             {rec.justification || 'No description provided.'}
           </p>
-          
+
           <div className="space-y-3">
             <SkillList title="Required Skills" skills={rec.requirements} color="green" maxVisible={3} />
             {rec.preferred_skills?.length > 0 && (
               <SkillList title="Preferred Skills" skills={rec.preferred_skills} color="blue" maxVisible={2} />
             )}
           </div>
-          
-          <div className="mt-6 flex gap-3">
+
+          <div className="mt-6 flex gap-2">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                // Open the internship URL in a new tab
+                const url = rec.url || rec.link || rec.application_url;
+                if (url && url !== 'N/A' && url !== 'Not specified' && url.trim() !== '') {
+                  window.open(url, '_blank', 'noopener,noreferrer');
+                } else {
+                  toast.info('No direct link available for this internship');
+                }
+              }}
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Apply Now
+            </motion.button>
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setIsLiked(!isLiked)}
-              className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 border-2
+              className={`px-4 py-3 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 border-2
                 ${isLiked ? 'bg-red-500 text-white border-red-500' : 'bg-white text-red-500 border-red-200 hover:bg-red-50'}
               `}
             >
               <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
-              {isLiked ? 'Liked' : 'Like'}
             </motion.button>
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setIsBookmarked(!isBookmarked)}
-              className={`flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 border-2
+              className={`px-4 py-3 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 border-2
                 ${isBookmarked ? 'bg-yellow-500 text-white border-yellow-500' : 'bg-white text-yellow-600 border-yellow-200 hover:bg-yellow-50'}
               `}
             >
               <BookmarkPlus className={`w-4 h-4 ${isBookmarked ? 'fill-current' : ''}`} />
-              {isBookmarked ? 'Bookmarked' : 'Bookmark'}
             </motion.button>
           </div>
         </motion.div>
@@ -2403,12 +2402,12 @@ const InternshipCard = ({ rec, index }) => {
 
 const SkillList = ({ title, skills, color, maxVisible }) => {
   if (!skills?.length) return null;
-  
+
   const colorClasses = {
     green: 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200',
     blue: 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200'
   };
-  
+
   return (
     <div className="bg-white p-4 rounded-lg border border-gray-200">
       <span className="text-sm text-gray-700 font-semibold mb-3 block">{title}:</span>
@@ -2442,7 +2441,7 @@ const StatCard = ({ value, label, color }) => {
     purple: 'bg-purple-50 border-purple-200 text-purple-800',
     orange: 'bg-orange-50 border-orange-200 text-orange-800'
   };
-  
+
   return (
     <motion.div
       whileHover={{ scale: 1.02, y: -2 }}
@@ -2460,7 +2459,7 @@ const PortfolioGaps = ({ analysisResults }) => {
   if (!analysisResults?.portfolio_gaps?.length) {
     return null;
   }
-  
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -2487,7 +2486,7 @@ const PortfolioGapItem = ({ gap }) => {
     medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
     low: 'bg-green-100 text-green-800 border-green-200'
   };
-  
+
   return (
     <div className="bg-gray-50 rounded-xl p-6 border border-gray-200 hover:shadow-md transition-shadow duration-200">
       <div className="flex items-start justify-between mb-4">
@@ -2528,17 +2527,17 @@ const PortfolioGapItem = ({ gap }) => {
 
 const ExtractionDetails = ({ analysisResults }) => {
   if (!analysisResults) return null;
-  
+
   const profile = analysisResults.student_profile || {};
   const extraction = analysisResults.detailed_extraction || {};
-  
+
   return (
     <div className="bg-white border-2 border-blue-100 rounded-2xl p-8 shadow-lg">
       <h3 className="text-2xl font-bold mb-6 flex items-center text-blue-900">
         <FileText className="w-6 h-6 mr-3 text-blue-600" />
         Extraction Details
       </h3>
-      
+
       {analysisResults.detailed_extraction && (
         <div className="grid md:grid-cols-3 gap-6 mb-8">
           <StatItem
@@ -2576,11 +2575,11 @@ const ExtractionDetails = ({ analysisResults }) => {
           </div>
         </div>
       )}
-      
+
       <div className="grid md:grid-cols-2 gap-6">
         <InfoItem label="Name" value={profile.name || 'Not detected'} />
         <InfoItem label="Experience Level" value={profile.experience_level || 'Entry-level'} capitalize />
-        
+
         <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
           <p className="text-gray-700 font-semibold text-sm mb-3">Contact Information</p>
           <div className="text-sm space-y-2">
@@ -2607,7 +2606,7 @@ const ExtractionDetails = ({ analysisResults }) => {
             )}
           </div>
         </div>
-        
+
         <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
           <p className="text-gray-700 font-semibold text-sm mb-3">Skills ({profile.skills?.length || 0})</p>
           <div className="flex flex-wrap gap-2">
@@ -2635,11 +2634,10 @@ const StatItem = ({ title, stats }) => (
       {stats.map((stat, idx) => (
         <div key={idx} className="text-sm">
           {stat.hasValue !== undefined ? (
-            <div className={`flex items-center justify-between p-2 rounded-lg border ${
-              stat.hasValue 
-                ? 'bg-green-50 text-green-700 border-green-200' 
-                : 'bg-red-50 text-red-700 border-red-200'
-            }`}>
+            <div className={`flex items-center justify-between p-2 rounded-lg border ${stat.hasValue
+              ? 'bg-green-50 text-green-700 border-green-200'
+              : 'bg-red-50 text-red-700 border-red-200'
+              }`}>
               <span className="flex items-center">
                 {stat.icon && <span className="mr-2">{stat.icon}</span>}
                 {stat.label}
@@ -2688,7 +2686,7 @@ const ProgressCard = ({ recentActivity, analysisResults }) => {
   const totalCount = recentActivity.length;
   const aiSteps = analysisResults?.agent_communications?.length || 0;
   const progressPercentage = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-  
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -2716,7 +2714,7 @@ const ProgressCard = ({ recentActivity, analysisResults }) => {
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-bold flex items-center text-white">
             <motion.div
-            //  animate={{ rotate: [0, 360] }}
+              //  animate={{ rotate: [0, 360] }}
               transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
               className="p-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl mr-4 shadow-lg"
             >
@@ -2781,7 +2779,7 @@ const ProgressCard = ({ recentActivity, analysisResults }) => {
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-4">
-          <motion.div 
+          <motion.div
             whileHover={{ scale: 1.05, y: -2 }}
             className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-2xl p-4 border border-green-400/30 shadow-lg backdrop-blur-sm"
           >
@@ -2796,7 +2794,7 @@ const ProgressCard = ({ recentActivity, analysisResults }) => {
             </div>
           </motion.div>
 
-          <motion.div 
+          <motion.div
             whileHover={{ scale: 1.05, y: -2 }}
             className="bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-2xl p-4 border border-blue-400/30 shadow-lg backdrop-blur-sm"
           >
@@ -2836,17 +2834,16 @@ const ProgressCard = ({ recentActivity, analysisResults }) => {
                   whileHover={{ scale: 1.02, x: 5 }}
                   className="flex items-center space-x-4 p-4 bg-gradient-to-r from-slate-800/50 to-blue-900/30 rounded-2xl border border-blue-400/20 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300"
                 >
-                  <motion.div 
-                    animate={{ 
+                  <motion.div
+                    animate={{
                       scale: activity.status === 'completed' ? [1, 1.2, 1] : 1,
-                      rotate: activity.status === 'completed' ? [0, 360, 0] : 0 
+                      rotate: activity.status === 'completed' ? [0, 360, 0] : 0
                     }}
                     transition={{ duration: 0.6 }}
-                    className={`p-3 rounded-2xl ${
-                      activity.status === 'completed' 
-                        ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg' 
-                        : 'bg-gradient-to-r from-gray-600 to-gray-700 text-gray-300'
-                    }`}
+                    className={`p-3 rounded-2xl ${activity.status === 'completed'
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg'
+                      : 'bg-gradient-to-r from-gray-600 to-gray-700 text-gray-300'
+                      }`}
                   >
                     {activity.icon}
                   </motion.div>
@@ -2866,9 +2863,9 @@ const ProgressCard = ({ recentActivity, analysisResults }) => {
                 </motion.div>
               ))}
             </div>
-            
+
             {analysisResults?.detailed_extraction && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5 }}
@@ -2884,7 +2881,7 @@ const ProgressCard = ({ recentActivity, analysisResults }) => {
                   Analysis Summary
                 </h4>
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  <motion.div 
+                  <motion.div
                     whileHover={{ scale: 1.05 }}
                     className="bg-gradient-to-r from-blue-500/20 to-cyan-500/20 p-3 rounded-xl border border-blue-400/30"
                   >
@@ -2893,7 +2890,7 @@ const ProgressCard = ({ recentActivity, analysisResults }) => {
                       <span className="font-bold text-blue-400">{analysisResults.detailed_extraction.total_words || 0}</span>
                     </div>
                   </motion.div>
-                  <motion.div 
+                  <motion.div
                     whileHover={{ scale: 1.05 }}
                     className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 p-3 rounded-xl border border-green-400/30"
                   >
@@ -2902,7 +2899,7 @@ const ProgressCard = ({ recentActivity, analysisResults }) => {
                       <span className="font-bold text-green-400">{analysisResults.extraction_info?.skills_count || 0}</span>
                     </div>
                   </motion.div>
-                  <motion.div 
+                  <motion.div
                     whileHover={{ scale: 1.05 }}
                     className="bg-gradient-to-r from-purple-500/20 to-violet-500/20 p-3 rounded-xl border border-purple-400/30"
                   >
@@ -2911,7 +2908,7 @@ const ProgressCard = ({ recentActivity, analysisResults }) => {
                       <span className="font-bold text-purple-400">{analysisResults.internship_recommendations?.length || 0}</span>
                     </div>
                   </motion.div>
-                  <motion.div 
+                  <motion.div
                     whileHover={{ scale: 1.05 }}
                     className="bg-gradient-to-r from-orange-500/20 to-amber-500/20 p-3 rounded-xl border border-orange-400/30"
                   >
@@ -2921,9 +2918,9 @@ const ProgressCard = ({ recentActivity, analysisResults }) => {
                     </div>
                   </motion.div>
                 </div>
-                
+
                 {analysisResults.agent_communications && (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.7 }}
@@ -2931,7 +2928,7 @@ const ProgressCard = ({ recentActivity, analysisResults }) => {
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-blue-300 font-medium">🤖 AI Success Rate:</span>
-                      <motion.span 
+                      <motion.span
                         animate={{ scale: [1, 1.1, 1] }}
                         transition={{ duration: 2, repeat: Infinity }}
                         className="text-xl font-bold text-emerald-400"
@@ -2957,7 +2954,7 @@ const NextStepsCard = ({ readinessEvaluation }) => {
   const steps = readinessEvaluation.next_steps || [];
   const timeline = readinessEvaluation.timeline;
   const [expandedStep, setExpandedStep] = useState(null);
-  
+
   const processedSteps = Array.isArray(steps) ? steps.map((step, index) => {
     if (typeof step === 'string') {
       return {
@@ -2973,7 +2970,7 @@ const NextStepsCard = ({ readinessEvaluation }) => {
     }
     return step;
   }) : [];
-  
+
   const getPriorityColor = (priority) => {
     switch (priority?.toLowerCase()) {
       case 'high': return 'text-red-300 bg-gradient-to-r from-red-500/20 to-pink-500/20 border-red-400/40';
@@ -2982,7 +2979,7 @@ const NextStepsCard = ({ readinessEvaluation }) => {
       default: return 'text-blue-300 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border-blue-400/40';
     }
   };
-  
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -3012,7 +3009,7 @@ const NextStepsCard = ({ readinessEvaluation }) => {
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-bold flex items-center text-white">
             <motion.div
-              animate={{ 
+              animate={{
                 y: [0, -3, 0],
                 // rotateY: [0, 180, 360]
               }}
@@ -3030,7 +3027,7 @@ const NextStepsCard = ({ readinessEvaluation }) => {
               </div>
             </div>
           </h3>
-          <motion.span 
+          <motion.span
             animate={{ scale: [1, 1.1, 1] }}
             transition={{ duration: 2, repeat: Infinity }}
             className="px-4 py-2 bg-gradient-to-r from-green-500/20 to-emerald-500/20 text-green-300 text-sm rounded-2xl border border-green-400/30 font-bold shadow-lg"
@@ -3054,7 +3051,7 @@ const NextStepsCard = ({ readinessEvaluation }) => {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-3">
-                      <motion.span 
+                      <motion.span
                         whileHover={{ scale: 1.05 }}
                         className={`px-4 py-2 rounded-xl text-sm font-bold border-2 ${getPriorityColor(step.priority)} shadow-lg`}
                       >
@@ -3084,7 +3081,7 @@ const NextStepsCard = ({ readinessEvaluation }) => {
                   </motion.div>
                 </div>
               </div>
-              
+
               <AnimatePresence>
                 {expandedStep === index && (
                   <motion.div
@@ -3108,7 +3105,7 @@ const NextStepsCard = ({ readinessEvaluation }) => {
                           {step.goal}
                         </p>
                       </motion.div>
-                      
+
                       <motion.div
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -3122,7 +3119,7 @@ const NextStepsCard = ({ readinessEvaluation }) => {
                           📅 {step.timeline}
                         </span>
                       </motion.div>
-                      
+
                       {step.resources && step.resources.length > 0 && (
                         <motion.div
                           initial={{ opacity: 0, x: -20 }}
@@ -3135,7 +3132,7 @@ const NextStepsCard = ({ readinessEvaluation }) => {
                           </h5>
                           <div className="space-y-2">
                             {step.resources.map((resource, resIndex) => (
-                              <motion.div 
+                              <motion.div
                                 key={resIndex}
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -3149,7 +3146,7 @@ const NextStepsCard = ({ readinessEvaluation }) => {
                           </div>
                         </motion.div>
                       )}
-                      
+
                       {step.success_metrics && step.success_metrics.length > 0 && (
                         <motion.div
                           initial={{ opacity: 0, x: -20 }}
@@ -3162,7 +3159,7 @@ const NextStepsCard = ({ readinessEvaluation }) => {
                           </h5>
                           <div className="space-y-2">
                             {step.success_metrics.map((metric, metricIndex) => (
-                              <motion.div 
+                              <motion.div
                                 key={metricIndex}
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -3176,7 +3173,7 @@ const NextStepsCard = ({ readinessEvaluation }) => {
                           </div>
                         </motion.div>
                       )}
-                      
+
                       {/* Additional sections with enhanced styling */}
                       {step.project_ideas && (
                         <motion.div
@@ -3190,7 +3187,7 @@ const NextStepsCard = ({ readinessEvaluation }) => {
                           </h5>
                           <div className="space-y-2">
                             {step.project_ideas.map((idea, ideaIndex) => (
-                              <motion.div 
+                              <motion.div
                                 key={ideaIndex}
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -3211,7 +3208,7 @@ const NextStepsCard = ({ readinessEvaluation }) => {
             </motion.div>
           ))}
         </div>
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8 }}
@@ -3230,7 +3227,7 @@ const NextStepsCard = ({ readinessEvaluation }) => {
               <p className="text-sm text-green-200 leading-relaxed">
                 Follow this personalized action plan to systematically improve your internship readiness and achieve your career goals. Each step is designed to build upon the previous one for maximum impact.
               </p>
-              <motion.div 
+              <motion.div
                 className="mt-4 flex items-center space-x-3"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -3298,7 +3295,7 @@ const AIInsightsCard = ({ analysisResults }) => {
           <p className="text-purple-200 text-sm leading-relaxed">
             Upload your resume to unlock powerful AI-driven insights and personalized recommendations
           </p>
-          <motion.div 
+          <motion.div
             className="mt-4 text-purple-300 text-xs"
             animate={{ opacity: [0.5, 1, 0.5] }}
             transition={{ duration: 2, repeat: Infinity }}
@@ -3309,7 +3306,7 @@ const AIInsightsCard = ({ analysisResults }) => {
       </motion.div>
     );
   }
-  
+
   const skills = analysisResults.student_profile?.skills || [];
   const recommendations = analysisResults.internship_recommendations || [];
   const averageMatch = Math.round(
@@ -3317,7 +3314,7 @@ const AIInsightsCard = ({ analysisResults }) => {
   );
   const gaps = analysisResults.portfolio_gaps || [];
   const focusArea = gaps.length > 0 ? gaps[0].title || 'Portfolio Enhancement' : 'Ready to apply!';
-  
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -3346,7 +3343,7 @@ const AIInsightsCard = ({ analysisResults }) => {
       <div className="relative z-10">
         <h3 className="text-xl font-bold mb-6 flex items-center text-white">
           <motion.div
-            animate={{ 
+            animate={{
               // rotate: [0, 360],
               scale: [1, 1.1, 1]
             }}
@@ -3364,9 +3361,9 @@ const AIInsightsCard = ({ analysisResults }) => {
             </div>
           </div>
         </h3>
-        
+
         <div className="space-y-5">
-          <motion.div 
+          <motion.div
             whileHover={{ scale: 1.02, y: -2 }}
             className="bg-gradient-to-r from-purple-800/30 to-violet-800/30 rounded-2xl p-5 border-2 border-purple-400/30 shadow-lg backdrop-blur-sm"
           >
@@ -3376,7 +3373,7 @@ const AIInsightsCard = ({ analysisResults }) => {
             </h4>
             <div className="flex flex-wrap gap-2">
               {skills.slice(0, 3).map((skill, idx) => (
-                <motion.span 
+                <motion.span
                   key={idx}
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -3388,7 +3385,7 @@ const AIInsightsCard = ({ analysisResults }) => {
                 </motion.span>
               ))}
               {skills.length > 3 && (
-                <motion.span 
+                <motion.span
                   whileHover={{ scale: 1.1 }}
                   className="px-3 py-2 bg-gradient-to-r from-purple-600/40 to-violet-600/40 text-purple-200 text-sm rounded-xl border border-purple-400/40 font-bold"
                 >
@@ -3397,8 +3394,8 @@ const AIInsightsCard = ({ analysisResults }) => {
               )}
             </div>
           </motion.div>
-          
-          <motion.div 
+
+          <motion.div
             whileHover={{ scale: 1.02, y: -2 }}
             className="bg-gradient-to-r from-blue-800/30 to-cyan-800/30 rounded-2xl p-5 border-2 border-blue-400/30 shadow-lg backdrop-blur-sm"
           >
@@ -3408,7 +3405,7 @@ const AIInsightsCard = ({ analysisResults }) => {
             </h4>
             <div className="flex items-center justify-between">
               <span className="text-blue-200 font-medium">Average Score:</span>
-              <motion.span 
+              <motion.span
                 animate={{ scale: [1, 1.1, 1] }}
                 transition={{ duration: 2, repeat: Infinity }}
                 className="text-3xl font-bold text-blue-400"
@@ -3425,8 +3422,8 @@ const AIInsightsCard = ({ analysisResults }) => {
               />
             </div>
           </motion.div>
-          
-          <motion.div 
+
+          <motion.div
             whileHover={{ scale: 1.02, y: -2 }}
             className="bg-gradient-to-r from-orange-800/30 to-amber-800/30 rounded-2xl p-5 border-2 border-orange-400/30 shadow-lg backdrop-blur-sm"
           >
@@ -3476,7 +3473,7 @@ const QuickActionsCard = ({ analysisResults, showAgentComm, setShowAgentComm, se
       <div className="relative z-10 p-6">
         <h3 className="text-xl font-bold mb-6 flex items-center text-white">
           <motion.div
-            animate={{ 
+            animate={{
               scale: [1, 1.1, 1]
             }}
             transition={{ duration: 4, repeat: Infinity }}
@@ -3493,7 +3490,7 @@ const QuickActionsCard = ({ analysisResults, showAgentComm, setShowAgentComm, se
             </div>
           </div>
         </h3>
-        
+
         <div className="space-y-4">
           <motion.button
             whileHover={{ scale: 1.05, y: -2 }}
@@ -3609,9 +3606,9 @@ const QuickActionsCard = ({ analysisResults, showAgentComm, setShowAgentComm, se
             </>
           )}
         </div>
-        
+
         {/* Add some additional info or tips */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1 }}
@@ -3640,7 +3637,7 @@ const QuickActionsCard = ({ analysisResults, showAgentComm, setShowAgentComm, se
 const GitHubAnalysis = ({ profile }) => {
   const githubData = profile.github_analysis;
   if (!githubData) return null;
-  
+
   return (
     <motion.div
       whileHover={{ scale: 1.02, y: -4 }}
@@ -3686,7 +3683,7 @@ const GitHubAnalysis = ({ profile }) => {
               </div>
             </div>
           </div>
-          <motion.span 
+          <motion.span
             animate={{ scale: [1, 1.1, 1] }}
             transition={{ duration: 2, repeat: Infinity }}
             className="px-4 py-2 bg-gradient-to-r from-purple-500/20 to-violet-500/20 text-purple-300 text-sm rounded-2xl border border-purple-400/30 font-bold shadow-lg"
@@ -3696,7 +3693,7 @@ const GitHubAnalysis = ({ profile }) => {
         </h4>
 
         <div className="grid grid-cols-2 gap-4 mb-6">
-          <motion.div 
+          <motion.div
             whileHover={{ scale: 1.05, y: -2 }}
             className="bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-2xl p-4 border border-blue-400/30 shadow-lg backdrop-blur-sm"
           >
@@ -3716,7 +3713,7 @@ const GitHubAnalysis = ({ profile }) => {
             </div>
           </motion.div>
 
-          <motion.div 
+          <motion.div
             whileHover={{ scale: 1.05, y: -2 }}
             className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-2xl p-4 border border-green-400/30 shadow-lg backdrop-blur-sm"
           >
@@ -3736,7 +3733,7 @@ const GitHubAnalysis = ({ profile }) => {
             </div>
           </motion.div>
 
-          <motion.div 
+          <motion.div
             whileHover={{ scale: 1.05, y: -2 }}
             className="bg-gradient-to-r from-purple-500/20 to-violet-500/20 rounded-2xl p-4 border border-purple-400/30 shadow-lg backdrop-blur-sm"
           >
@@ -3756,7 +3753,7 @@ const GitHubAnalysis = ({ profile }) => {
             </div>
           </motion.div>
 
-          <motion.div 
+          <motion.div
             whileHover={{ scale: 1.05, y: -2 }}
             className="bg-gradient-to-r from-orange-500/20 to-amber-500/20 rounded-2xl p-4 border border-orange-400/30 shadow-lg backdrop-blur-sm"
           >
@@ -3778,7 +3775,7 @@ const GitHubAnalysis = ({ profile }) => {
         </div>
 
         {githubData.top_languages && githubData.top_languages.length > 0 && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
@@ -3790,7 +3787,7 @@ const GitHubAnalysis = ({ profile }) => {
             </div>
             <div className="flex flex-wrap gap-2">
               {githubData.top_languages.map((lang, idx) => (
-                <motion.span 
+                <motion.span
                   key={idx}
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -3818,7 +3815,7 @@ const GitHubAnalysis = ({ profile }) => {
             </div>
             <div className="flex flex-wrap gap-2">
               {githubData.project_types.map((type, idx) => (
-                <motion.span 
+                <motion.span
                   key={idx}
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -3833,7 +3830,7 @@ const GitHubAnalysis = ({ profile }) => {
           </motion.div>
         )}
 
-        <motion.div 
+        <motion.div
           className="mt-6 pt-4 border-t border-gray-600/30"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

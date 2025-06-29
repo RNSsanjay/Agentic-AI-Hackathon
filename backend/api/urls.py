@@ -44,4 +44,7 @@ urlpatterns = [
     path('profile/', views.user_profile, name='user_profile'),
     path('profile/avatar/', views.upload_avatar, name='upload_avatar'),
     path('profile/stats/', views.profile_stats, name='profile_stats'),
+
+    # Test scraping endpoint
+    path('test/scrape/', views.test_scraping, name='test_scraping'),
 ]

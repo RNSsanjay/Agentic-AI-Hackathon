@@ -18,6 +18,14 @@ from pathlib import Path
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
+# Try to import Gemini service for text processing
+try:
+    from utils.gemini_service import gemini_service
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+    gemini_service = None
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -548,7 +556,7 @@ class InternshipScraper:
                 await asyncio.sleep(0.5)
 
     async def _extract_indeed_job_data(self, card):
-        """Extract job data from Indeed job card with improved cleaning"""
+        """Extract job data from Indeed job card with improved cleaning using Gemini AI"""
         try:
             title = await self._get_inner_text(card, 'h2 a span')
             company = await self._get_inner_text(card, '[data-testid="company-name"]')
@@ -568,12 +576,46 @@ class InternshipScraper:
             salary_elem = await card.query_selector('[data-testid="salary-snippet"]')
             salary = await salary_elem.inner_text() if salary_elem else "Not specified"
 
-            # Clean all text fields
-            title_clean = self._clean_text(title)
-            company_clean = self._clean_text(company) 
-            location_clean = self._clean_text(location_text)
-            summary_clean = self._clean_text(summary)
-            salary_clean = self._clean_text(salary)
+            # Create raw data for Gemini processing
+            raw_data = {
+                'title': title,
+                'company': company,
+                'location': location_text,
+                'description': summary,
+                'stipend': salary,
+                'source': 'Indeed'
+            }
+
+            # Use Gemini to extract and structure data if available
+            if GEMINI_AVAILABLE and gemini_service.available:
+                try:
+                    processed_data = gemini_service.extract_internship_details(raw_data)
+                    title_clean = processed_data.get('title', self._clean_text(title))
+                    company_clean = processed_data.get('company', self._clean_text(company))
+                    location_clean = processed_data.get('location', self._clean_text(location_text))
+                    summary_clean = processed_data.get('description', self._clean_text(summary))
+                    salary_clean = processed_data.get('stipend', self._clean_text(salary))
+                    skills = processed_data.get('skills', [])
+                    internship_type = processed_data.get('type', 'Not specified')
+                except Exception as e:
+                    logger.warning(f"Gemini processing failed for Indeed data: {e}")
+                    # Fallback to basic cleaning
+                    title_clean = self._clean_text(title)
+                    company_clean = self._clean_text(company) 
+                    location_clean = self._clean_text(location_text)
+                    summary_clean = self._clean_text(summary)
+                    salary_clean = self._clean_text(salary)
+                    skills = self._extract_skills_from_text(summary_clean)
+                    internship_type = 'Not specified'
+            else:
+                # Basic cleaning without Gemini
+                title_clean = self._clean_text(title)
+                company_clean = self._clean_text(company) 
+                location_clean = self._clean_text(location_text)
+                summary_clean = self._clean_text(summary)
+                salary_clean = self._clean_text(salary)
+                skills = self._extract_skills_from_text(summary_clean)
+                internship_type = 'Not specified'
 
             return {
                 'id': self.generate_unique_id({'title': title_clean, 'company': company_clean, 'source': 'Indeed'}),
@@ -583,15 +625,16 @@ class InternshipScraper:
                 'domain': self._extract_domain_from_title(title_clean),
                 'duration': "Not specified",
                 'stipend': salary_clean,
-                'requirements': self._extract_skills_from_text(summary_clean),
+                'requirements': skills if isinstance(skills, list) else [skills] if skills else [],
                 'preferred_skills': [],
                 'description': self._truncate_text(summary_clean, 200),
                 'responsibilities': [],
                 'qualifications': [summary_clean] if summary_clean and summary_clean != "N/A" else [],
                 'experience_level': "entry-level",
-                'tags': ["indeed", "remote-friendly", "real-time"],
+                'tags': ["indeed", "remote-friendly", "real-time", internship_type.lower()],
                 'link': link,
                 'source': 'Indeed',
+                'type': internship_type,
                 'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'application_deadline': (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
             }
@@ -600,23 +643,50 @@ class InternshipScraper:
             return None
 
     async def _extract_linkedin_job_data(self, card):
-        """Extract job data from LinkedIn job card with improved cleaning"""
+        """Extract job data from LinkedIn job card with improved cleaning using Gemini AI"""
         try:
             title = await self._get_inner_text(card, '.base-search-card__title')
             company = await self._get_inner_text(card, '.base-search-card__subtitle')
             location_text = await self._get_inner_text(card, '.job-search-card__location')
             link = await self._get_attribute(card, '.base-card__full-link', 'href')
 
-            # Clean all text fields
-            title_clean = self._clean_text(title)
-            company_clean = self._clean_text(company)
-            location_clean = self._clean_text(location_text)
-
-            if not title_clean or title_clean == "N/A":
+            if not title or self._clean_text(title) == "N/A":
                 return None
 
             # Clean and validate link
             link = self._validate_url(link)
+
+            # Create raw data for Gemini processing
+            raw_data = {
+                'title': title,
+                'company': company,
+                'location': location_text,
+                'description': f"Professional internship opportunity at {company}. Apply directly through LinkedIn.",
+                'source': 'LinkedIn'
+            }
+
+            # Use Gemini to extract and structure data if available
+            if GEMINI_AVAILABLE and gemini_service.available:
+                try:
+                    processed_data = gemini_service.extract_internship_details(raw_data)
+                    title_clean = processed_data.get('title', self._clean_text(title))
+                    company_clean = processed_data.get('company', self._clean_text(company))
+                    location_clean = processed_data.get('location', self._clean_text(location_text))
+                    skills = processed_data.get('skills', [])
+                    internship_type = processed_data.get('type', 'Not specified')
+                except Exception as e:
+                    logger.warning(f"Gemini processing failed for LinkedIn data: {e}")
+                    title_clean = self._clean_text(title)
+                    company_clean = self._clean_text(company)
+                    location_clean = self._clean_text(location_text)
+                    skills = self._extract_skills_from_text(title_clean)
+                    internship_type = 'Not specified'
+            else:
+                title_clean = self._clean_text(title)
+                company_clean = self._clean_text(company)
+                location_clean = self._clean_text(location_text)
+                skills = self._extract_skills_from_text(title_clean)
+                internship_type = 'Not specified'
 
             return {
                 'id': self.generate_unique_id({'title': title_clean, 'company': company_clean, 'source': 'LinkedIn'}),
@@ -626,15 +696,16 @@ class InternshipScraper:
                 'domain': self._extract_domain_from_title(title_clean),
                 'duration': "Not specified",
                 'stipend': "Not specified",
-                'requirements': self._extract_skills_from_text(title_clean),
+                'requirements': skills if isinstance(skills, list) else [skills] if skills else [],
                 'preferred_skills': [],
                 'description': f"Professional internship opportunity at {company_clean}. Apply directly through LinkedIn.",
                 'responsibilities': [],
                 'qualifications': [],
                 'experience_level': "entry-level",
-                'tags': ["linkedin", "professional", "real-time"],
+                'tags': ["linkedin", "professional", "real-time", internship_type.lower()],
                 'link': link,
                 'source': 'LinkedIn',
+                'type': internship_type,
                 'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'application_deadline': (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
             }
@@ -884,8 +955,15 @@ class InternshipScraper:
         # Return top 6 skills to avoid overwhelming
 
     def _clean_text(self, text):
-        """Helper method to clean text and remove invalid characters"""
-        return self._enhanced_clean_text(text)
+        """Helper method to clean text and remove invalid characters using Gemini AI"""
+        if GEMINI_AVAILABLE and gemini_service.available:
+            try:
+                return gemini_service.clean_text(text)
+            except Exception as e:
+                logger.warning(f"Gemini text cleaning failed, using fallback: {e}")
+                return self._enhanced_clean_text(text)
+        else:
+            return self._enhanced_clean_text(text)
 
     def _truncate_text(self, text, length):
         """Helper method to truncate text properly"""
